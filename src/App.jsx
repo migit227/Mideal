@@ -47,31 +47,44 @@ export default function App() {
         const style = document.createElement('style');
         style.id = id;
         style.innerHTML = `
-        :root{--bg:#0b0f15;--accent:#4f9aff;--muted:#9aa6b2}
+        :root{--bg:#0b0f15;--accent:#4f9aff;--muted:#9aa6b2;--glass:rgba(255,255,255,0.03);}
         *{box-sizing:border-box}
-        body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:#e6eef8}
-        .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
-        .auth-screen{height:100vh;display:flex;align-items:center;justify-content:center}
-        .auth-card{width:360px;padding:28px;border-radius:14px;background:linear-gradient(180deg,#0e1620,#071017)}
-        .auth-card input{width:100%;padding:10px;margin:8px 0;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
-        .primary{background:var(--accent);color:#fff;padding:8px 12px;border-radius:8px;border:none}
-        .ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 10px;border-radius:8px;color:var(--muted)}
+        body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:#e6eef8;-webkit-font-smoothing:antialiased}
+        .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;padding:12px 8px}
+        .brand{font-weight:700;letter-spacing:1px}
+        .auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+        .auth-card{width:100%;max-width:980px;border-radius:16px;display:grid;grid-template-columns:1fr 1fr;overflow:hidden}
+        .auth-left{background:linear-gradient(135deg,#ff7a7a,#7a8bff);padding:40px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#111}
+        .auth-left h1{font-size:48px;margin:0;letter-spacing:2px;color:white}
+        .auth-left p{opacity:0.9}
+        .auth-right{padding:28px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent)}
+        .auth-form{max-width:360px;margin:0 auto}
+        .auth-form input{width:100%;padding:12px;margin:10px 0;border-radius:10px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit}
+        .auth-actions{display:flex;gap:8px;flex-wrap:wrap}
+        .primary{background:var(--accent);color:#fff;padding:10px 14px;border-radius:10px;border:none;cursor:pointer}
+        .ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 10px;border-radius:10px;color:var(--muted);cursor:pointer}
+        .loading-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,rgba(2,6,23,0.6),rgba(2,6,23,0.85));z-index:60}
+        .logo-anim{font-size:42px;font-weight:800;letter-spacing:6px;color:transparent;background:linear-gradient(90deg,#fff,#4f9aff,#fff);-webkit-background-clip:text;background-clip:text;animation:logoPulse 1.8s infinite}
+        @keyframes logoPulse{0%{filter:blur(0px);transform:translateY(0)}50%{filter:blur(2px);transform:translateY(-6px)}100%{filter:blur(0px);transform:translateY(0)}}
         .card-glass{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));backdrop-filter: blur(6px);padding:12px;border-radius:12px}
         .overlay{position:fixed;inset:0;background:rgba(2,6,23,0.7);display:flex;align-items:center;justify-content:center;z-index:40}
-        .modal{background:#071016;padding:18px;border-radius:12px;width:92%;max-width:760px}
+        .modal{background:#071016;padding:18px;border-radius:12px;width:92%;max-width:760px;animation:pop .18s ease}
+        @keyframes pop{from{opacity:0;transform:scale(.98) translateY(6px)}to{opacity:1;transform:none}}
+        .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+        .toggle{display:flex;align-items:center;gap:8px;padding:10px;border-radius:10px;background:var(--glass)}
         .avatar-large{width:96px;height:96px;border-radius:12px;overflow:hidden;background:#091018;display:flex;align-items:center;justify-content:center}
         .avatar-small,.avatar{width:40px;height:40px;border-radius:10px;overflow:hidden;background:#091018;display:flex;align-items:center;justify-content:center}
         .initial{font-weight:700;color:var(--muted)}
         .newpost{display:flex;gap:12px;align-items:flex-start;margin-bottom:16px;padding:12px;border-radius:12px}
         .newpost textarea{width:100%;min-height:64px;padding:10px;border-radius:10px;border:none;background:rgba(255,255,255,0.02);color:inherit}
         .posts{display:flex;flex-direction:column;gap:12px}
-        .post{display:flex;gap:12px;padding:12px;border-radius:12px;transition:transform .18s ease, box-shadow .18s ease}
+        .post{display:flex;gap:12px;padding:12px;border-radius:12px;transition:transform .28s cubic-bezier(.2,.8,.2,1), box-shadow .28s}
         .post:hover{transform:translateY(-6px);box-shadow:0 12px 30px rgba(0,0,0,0.6)}
         .post-left{width:56px}
         .post-body{flex:1}
         .post-header{display:flex;justify-content:space-between;align-items:center}
         .post-text{margin:8px 0}
-        .actions button,.comment-actions button,.post-controls button{background:transparent;border:none;color:var(--muted);margin-right:6px}
+        .actions button,.comment-actions button,.post-controls button{background:transparent;border:none;color:var(--muted);margin-right:6px;cursor:pointer}
         .linkish{background:none;border:none;color:var(--accent);cursor:pointer}
         .comment{display:flex;gap:8px;padding:8px 0;border-top:1px solid rgba(255,255,255,0.02)}
         .comment .comment-left{width:40px}
@@ -81,6 +94,12 @@ export default function App() {
         .muted.small{font-size:12px;color:var(--muted)}
         .fade-in{animation:fadeIn .25s ease}
         @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+        @media(max-width:900px){
+          .auth-card{grid-template-columns:1fr;}
+          .auth-left{padding:28px}
+          .topbar{padding:12px}
+          .post{flex-direction:row}
+        }
         `;
         document.head.appendChild(style);
     }, []);
@@ -459,24 +478,33 @@ export default function App() {
         fontFamily: "sans-serif",
     };
 
-    // LOGIN SCREEN
+    // LOGIN SCREEN (redesigned)
     if (mode === "login") {
         return (
-            <div className="auth">
-                <div className="card">
-                    <h1>Mideal</h1>
-                    <p>beta</p>
+            <div className="auth-screen">
+                <div className="auth-card">
+                    <div className="auth-left">
+                        <h1>Mideal</h1>
+                        <p>Share moments. Connect easily.</p>
+                    </div>
+                    <div className="auth-right">
+                        <div className="auth-form card-glass">
+                            <h2 style={{marginTop:0}}>Welcome back</h2>
+                            <p className="muted small">Log in to continue</p>
+                            <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                            <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
 
-                    <input placeholder="email" onChange={(e) => setEmail(e.target.value)} />
-                    <input type="password" placeholder="password" onChange={(e) => setPassword(e.target.value)} />
+                            <div style={{display:'flex',gap:8,marginTop:8}} className="auth-actions">
+                                <button className="primary" onClick={login}>Log in</button>
+                                <button className="ghost" onClick={register}>Register</button>
+                                <button className="ghost" onClick={guest}>Guest</button>
+                            </div>
 
-                    <button onClick={login}>login</button>
-                    <button onClick={register}>register</button>
-                    <button onClick={guest}>guest</button>
-
-                    <button className="google" onClick={googleLogin}>
-                        Continue with Google
-                    </button>
+                            <div style={{marginTop:12}}>
+                                <button className="primary" style={{background:'#fff',color:'#111',width:'100%'}} onClick={googleLogin}>Continue with Google</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         );
@@ -499,15 +527,42 @@ export default function App() {
             {settingsOpen && (
                 <div className="overlay">
                     <div className="modal">
-                        <h3>settings</h3>
+                        <h3>Settings</h3>
+                        <div className="settings-grid">
+                            <div className="toggle">
+                                <div style={{fontWeight:700}}>Theme</div>
+                                <div style={{marginLeft:'auto',display:'flex',gap:8}}>
+                                    <button className="ghost" onClick={() => setTheme('dark')}>Dark</button>
+                                    <button className="ghost" onClick={() => setTheme('light')}>Light</button>
+                                </div>
+                            </div>
 
-                        <button onClick={() => setTheme("dark")}>dark</button>
-                        <button onClick={() => setTheme("light")}>light</button>
+                            <div className="toggle">
+                                <div style={{fontWeight:700}}>Language</div>
+                                <div style={{marginLeft:'auto',display:'flex',gap:8}}>
+                                    <button className="ghost" onClick={() => setLang('ru')}>RU</button>
+                                    <button className="ghost" onClick={() => setLang('en')}>EN</button>
+                                </div>
+                            </div>
 
-                        <button onClick={() => setLang("ru")}>RU</button>
-                        <button onClick={() => setLang("en")}>EN</button>
+                            <div className="toggle">
+                                <div style={{fontWeight:700}}>Account</div>
+                                <div style={{marginLeft:'auto'}}>
+                                    <button className="ghost" onClick={openProfile}>Profile</button>
+                                </div>
+                            </div>
 
-                        <button onClick={() => setSettingsOpen(false)}>close</button>
+                            <div className="toggle">
+                                <div style={{fontWeight:700}}>Danger</div>
+                                <div style={{marginLeft:'auto'}}>
+                                    <button className="ghost" style={{color:'#f55'}} onClick={deleteAccount}>Delete Account</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style={{marginTop:12, textAlign:'right'}}>
+                            <button onClick={() => setSettingsOpen(false)} className="ghost">Close</button>
+                        </div>
                     </div>
                 </div>
             )}
