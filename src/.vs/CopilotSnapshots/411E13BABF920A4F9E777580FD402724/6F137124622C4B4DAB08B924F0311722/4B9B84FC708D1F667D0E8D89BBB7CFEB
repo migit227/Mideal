@@ -1,0 +1,344 @@
+﻿import { useEffect, useState } from "react";
+import { db } from "./firebase";
+
+import {
+    collection,
+    addDoc,
+    // getDocs,
+    query,
+    orderBy,
+    doc,
+    setDoc,
+    getDoc,
+    updateDoc,
+    deleteDoc,
+    onSnapshot,
+} from "firebase/firestore";
+
+import {
+    getAuth,
+    onAuthStateChanged,
+    signInWithEmailAndPassword,
+    createUserWithEmailAndPassword,
+    signInAnonymously,
+    signOut,
+    GoogleAuthProvider,
+    signInWithPopup,
+} from "firebase/auth";
+
+export default function App() {
+    const auth = getAuth();
+
+    const [user, setUser] = useState(null);
+    const [mode, setMode] = useState("login");
+
+    const [posts, setPosts] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [usersMap, setUsersMap] = useState({});
+
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+
+    const [postText, setPostText] = useState("");
+
+    const [settingsOpen, setSettingsOpen] = useState(false);
+    const [theme, setTheme] = useState("dark");
+    const [lang, setLang] = useState("ru");
+
+    const postsRef = collection(db, "posts");
+    const usersRef = collection(db, "users");
+
+    // AUTH
+    useEffect(() => {
+        onAuthStateChanged(auth, async (u) => {
+            try {
+                setUser(u);
+                setMode(u ? "app" : "login");
+
+                if (u) {
+                    // ensure user profile exists in firestore
+                    const userDocRef = doc(db, "users", u.uid);
+                    const snap = await getDoc(userDocRef);
+                    const name = u.displayName || (u.email ? u.email.split("@")[0] : "Guest");
+                    const photoURL = u.photoURL || null;
+
+                    if (!snap.exists()) {
+                        await setDoc(userDocRef, {
+                            uid: u.uid,
+                            email: u.email || null,
+                            name,
+                            photoURL,
+                            createdAt: Date.now(),
+                        });
+                        setUsersMap((m) => ({ ...m, [u.uid]: { uid: u.uid, name, photoURL } }));
+                    } else {
+                        const data = snap.data();
+                        setUsersMap((m) => ({ ...m, [u.uid]: { uid: u.uid, name: data.name || name, photoURL: data.photoURL || photoURL } }));
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        });
+    }, []);
+
+    // LOAD POSTS (real-time)
+    useEffect(() => {
+        setLoading(true);
+        setError(null);
+
+        const q = query(postsRef, orderBy("createdAt", "desc"));
+        const unsubscribe = onSnapshot(
+            q,
+            async (snap) => {
+                try {
+                    const postsData = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+                    setPosts(postsData);
+
+                    // ensure we have user info for authors
+                    const missingUids = Array.from(new Set(postsData.map((p) => p.uid))).filter((uid) => uid && !usersMap[uid]);
+                    if (missingUids.length) {
+                        for (const uid of missingUids) {
+                            try {
+                                const uSnap = await getDoc(doc(db, "users", uid));
+                                if (uSnap.exists()) {
+                                    const data = uSnap.data();
+                                    setUsersMap((m) => ({ ...m, [uid]: { uid, name: data.name || null, photoURL: data.photoURL || null } }));
+                                }
+                            } catch (e) {
+                                console.error("failed to load user", uid, e);
+                            }
+                        }
+                    }
+
+                    setLoading(false);
+                } catch (e) {
+                    console.error(e);
+                    setError("Failed to load posts");
+                    setLoading(false);
+                }
+            },
+            (err) => {
+                console.error(err);
+                setError("Failed to subscribe to posts");
+                setLoading(false);
+            }
+        );
+
+        return () => unsubscribe();
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // AUTH ACTIONS
+    const login = async () => {
+        try {
+            await signInWithEmailAndPassword(auth, email, password);
+        } catch (e) {
+            alert(e.message);
+        }
+    };
+
+    const register = async () => {
+        try {
+            const res = await createUserWithEmailAndPassword(auth, email, password);
+            // create user doc handled in onAuthStateChanged
+            return res;
+        } catch (e) {
+            alert(e.message);
+        }
+    };
+
+    const guest = async () => {
+        try {
+            await signInAnonymously(auth);
+        } catch (e) {
+            alert(e.message);
+        }
+    };
+
+    const googleLogin = async () => {
+        try {
+            await signInWithPopup(auth, new GoogleAuthProvider());
+        } catch (e) {
+            alert(e.message);
+        }
+    };
+
+    const logout = async () => {
+        if (!confirm("Are you sure you want to logout?")) return;
+        try {
+            await signOut(auth);
+        } catch (e) {
+            alert(e.message);
+        }
+    };
+
+    // POSTS
+    const createPost = async () => {
+        if (!user) return alert("You must be logged in to post");
+        if (!postText.trim()) return;
+
+        try {
+            const authorName = usersMap[user.uid]?.name || user.displayName || (user.email ? user.email.split("@")[0] : "Guest");
+            const authorPhoto = usersMap[user.uid]?.photoURL || user.photoURL || null;
+
+            await addDoc(postsRef, {
+                text: postText,
+                uid: user.uid,
+                authorName,
+                authorPhoto,
+                likes: [],
+                dislikes: [],
+                createdAt: Date.now(),
+            });
+
+            setPostText("");
+        } catch (e) {
+            console.error(e);
+            alert("Failed to create post");
+        }
+    };
+
+    const toggleLike = async (post) => {
+        if (!user) return alert("Login to like");
+        const uid = user.uid;
+        let likes = post.likes || [];
+        let dislikes = post.dislikes || [];
+
+        if (likes.includes(uid)) {
+            likes = likes.filter((x) => x !== uid);
+        } else {
+            likes.push(uid);
+            dislikes = dislikes.filter((x) => x !== uid);
+        }
+
+        try {
+            await updateDoc(doc(db, "posts", post.id), { likes, dislikes });
+        } catch (e) {
+            console.error(e);
+            alert("Failed to update like");
+        }
+    };
+
+    const toggleDislike = async (post) => {
+        if (!user) return alert("Login to dislike");
+        const uid = user.uid;
+        let likes = post.likes || [];
+        let dislikes = post.dislikes || [];
+
+        if (dislikes.includes(uid)) {
+            dislikes = dislikes.filter((x) => x !== uid);
+        } else {
+            dislikes.push(uid);
+            likes = likes.filter((x) => x !== uid);
+        }
+
+        try {
+            await updateDoc(doc(db, "posts", post.id), { likes, dislikes });
+        } catch (e) {
+            console.error(e);
+            alert("Failed to update dislike");
+        }
+    };
+
+    const deletePost = async (post) => {
+        if (!user) return alert("Login to delete");
+        if (post.uid !== user.uid) return alert("You can only delete your own posts");
+
+        if (!confirm("Delete this post?")) return;
+
+        try {
+            await deleteDoc(doc(db, "posts", post.id));
+        } catch (e) {
+            console.error(e);
+            alert("Failed to delete post");
+        }
+    };
+
+    const container = {
+        minHeight: "100vh",
+        padding: 20,
+        maxWidth: 900,
+        margin: "0 auto",
+        background: theme === "dark" ? "#0f0f0f" : "#f5f5f5",
+        color: theme === "dark" ? "#fff" : "#000",
+        fontFamily: "sans-serif",
+    };
+
+    // LOGIN SCREEN
+    if (mode === "login") {
+        return (
+            <div className="auth">
+                <div className="card">
+                    <h1>Mideal</h1>
+                    <p>beta</p>
+
+                    <input placeholder="email" onChange={(e) => setEmail(e.target.value)} />
+                    <input type="password" placeholder="password" onChange={(e) => setPassword(e.target.value)} />
+
+                    <button onClick={login}>login</button>
+                    <button onClick={register}>register</button>
+                    <button onClick={guest}>guest</button>
+
+                    <button className="google" onClick={googleLogin}>
+                        Continue with Google
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div style={container}>
+            {/* HEADER */}
+            <div className="topbar">
+                <h2>Mideal beta</h2>
+
+                <div style={{ display: "flex", gap: 10 }}>
+                    <button onClick={() => setSettingsOpen(true)}>settings</button>
+                    <button onClick={logout}>logout</button>
+                </div>
+            </div>
+
+            {/* SETTINGS */}
+            {settingsOpen && (
+                <div className="overlay">
+                    <div className="modal">
+                        <h3>settings</h3>
+
+                        <button onClick={() => setTheme("dark")}>dark</button>
+                        <button onClick={() => setTheme("light")}>light</button>
+
+                        <button onClick={() => setLang("ru")}>RU</button>
+                        <button onClick={() => setLang("en")}>EN</button>
+
+                        <button onClick={() => setSettingsOpen(false)}>close</button>
+                    </div>
+                </div>
+            )}
+
+            {/* CREATE POST */}
+            <div className="postBox">
+                <input
+                    value={postText}
+                    onChange={(e) => setPostText(e.target.value)}
+                    placeholder="write something..."
+                />
+                <button onClick={createPost}>post</button>
+            </div>
+
+            {/* POSTS */}
+            {posts.map((p) => (
+                <div key={p.id} className="post">
+                    <p>{p.text}</p>
+
+                    <div className="actions">
+                        <button onClick={() => toggleLike(p)}>👍 {p.likes?.length || 0}</button>
+                        <button onClick={() => toggleDislike(p)}>👎 {p.dislikes?.length || 0}</button>
+                        <button onClick={() => deletePost(p)}>delete</button>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}

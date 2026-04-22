@@ -1,0 +1,216 @@
+﻿import { useEffect, useState } from "react";
+import { db } from "./firebase";
+
+import {
+    collection,
+    addDoc,
+    getDocs,
+    query,
+    orderBy,
+    doc,
+    setDoc,
+    getDoc,
+    updateDoc,
+    deleteDoc,
+} from "firebase/firestore";
+
+import {
+    getAuth,
+    onAuthStateChanged,
+    signInWithEmailAndPassword,
+    createUserWithEmailAndPassword,
+    signInAnonymously,
+    signOut,
+    GoogleAuthProvider,
+    signInWithPopup,
+} from "firebase/auth";
+
+export default function App() {
+    const auth = getAuth();
+
+    const [user, setUser] = useState(null);
+    const [mode, setMode] = useState("login");
+
+    const [posts, setPosts] = useState([]);
+
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+
+    const [postText, setPostText] = useState("");
+
+    const [settingsOpen, setSettingsOpen] = useState(false);
+    const [theme, setTheme] = useState("dark");
+    const [lang, setLang] = useState("ru");
+
+    const postsRef = collection(db, "posts");
+
+    // AUTH
+    useEffect(() => {
+        onAuthStateChanged(auth, (u) => {
+            setUser(u);
+            setMode(u ? "app" : "login");
+        });
+    }, []);
+
+    // LOAD POSTS
+    const loadPosts = async () => {
+        const snap = await getDocs(query(postsRef, orderBy("createdAt", "desc")));
+        setPosts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    };
+
+    useEffect(() => {
+        loadPosts();
+    }, []);
+
+    // AUTH ACTIONS
+    const login = () => signInWithEmailAndPassword(auth, email, password);
+
+    const register = () => createUserWithEmailAndPassword(auth, email, password);
+
+    const guest = () => signInAnonymously(auth);
+
+    const googleLogin = () =>
+        signInWithPopup(auth, new GoogleAuthProvider());
+
+    const logout = () => signOut(auth);
+
+    // POSTS
+    const createPost = async () => {
+        if (!postText.trim()) return;
+
+        await addDoc(postsRef, {
+            text: postText,
+            uid: user.uid,
+            likes: [],
+            dislikes: [],
+            createdAt: Date.now(),
+        });
+
+        setPostText("");
+        loadPosts();
+    };
+
+    const toggleLike = async (post) => {
+        const uid = user.uid;
+        let likes = post.likes || [];
+        let dislikes = post.dislikes || [];
+
+        if (likes.includes(uid)) {
+            likes = likes.filter((x) => x !== uid);
+        } else {
+            likes.push(uid);
+            dislikes = dislikes.filter((x) => x !== uid);
+        }
+
+        await updateDoc(doc(db, "posts", post.id), { likes, dislikes });
+        loadPosts();
+    };
+
+    const toggleDislike = async (post) => {
+        const uid = user.uid;
+        let likes = post.likes || [];
+        let dislikes = post.dislikes || [];
+
+        if (dislikes.includes(uid)) {
+            dislikes = dislikes.filter((x) => x !== uid);
+        } else {
+            dislikes.push(uid);
+            likes = likes.filter((x) => x !== uid);
+        }
+
+        await updateDoc(doc(db, "posts", post.id), { likes, dislikes });
+        loadPosts();
+    };
+
+    const deletePost = async (post) => {
+        await deleteDoc(doc(db, "posts", post.id));
+        loadPosts();
+    };
+
+    const container = {
+        minHeight: "100vh",
+        padding: 20,
+        maxWidth: 900,
+        margin: "0 auto",
+        background: theme === "dark" ? "#0f0f0f" : "#f5f5f5",
+        color: theme === "dark" ? "#fff" : "#000",
+        fontFamily: "sans-serif",
+    };
+
+    // LOGIN SCREEN
+    if (mode === "login") {
+        return (
+            <div className="auth">
+                <div className="card">
+                    <h1>Mideal</h1>
+                    <p>beta</p>
+
+                    <input placeholder="email" onChange={(e) => setEmail(e.target.value)} />
+                    <input type="password" placeholder="password" onChange={(e) => setPassword(e.target.value)} />
+
+                    <button onClick={login}>login</button>
+                    <button onClick={register}>register</button>
+                    <button onClick={guest}>guest</button>
+
+                    <button className="google" onClick={googleLogin}>
+                        Continue with Google
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div style={container}>
+            {/* HEADER */}
+            <div className="topbar">
+                <h2>Mideal beta</h2>
+
+                <div style={{ display: "flex", gap: 10 }}>
+                    <button onClick={() => setSettingsOpen(true)}>settings</button>
+                    <button onClick={logout}>logout</button>
+                </div>
+            </div>
+
+            {/* SETTINGS */}
+            {settingsOpen && (
+                <div className="overlay">
+                    <div className="modal">
+                        <h3>settings</h3>
+
+                        <button onClick={() => setTheme("dark")}>dark</button>
+                        <button onClick={() => setTheme("light")}>light</button>
+
+                        <button onClick={() => setLang("ru")}>RU</button>
+                        <button onClick={() => setLang("en")}>EN</button>
+
+                        <button onClick={() => setSettingsOpen(false)}>close</button>
+                    </div>
+                </div>
+            )}
+
+            {/* CREATE POST */}
+            <div className="postBox">
+                <input
+                    value={postText}
+                    onChange={(e) => setPostText(e.target.value)}
+                    placeholder="write something..."
+                />
+                <button onClick={createPost}>post</button>
+            </div>
+
+            {/* POSTS */}
+            {posts.map((p) => (
+                <div key={p.id} className="post">
+                    <p>{p.text}</p>
+
+                    <div className="actions">
+                        <button onClick={() => toggleLike(p)}>👍 {p.likes?.length || 0}</button>
+                        <button onClick={() => toggleDislike(p)}>👎 {p.dislikes?.length || 0}</button>
+                        <button onClick={() => deletePost(p)}>delete</button>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
