@@ -50,23 +50,24 @@ export default function App() {
         :root{--bg:#0b0f15;--accent:#4f9aff;--muted:#9aa6b2;--glass:rgba(255,255,255,0.03);}
         *{box-sizing:border-box}
         body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:#e6eef8;-webkit-font-smoothing:antialiased}
-        .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;padding:12px 8px}
-        .brand{font-weight:700;letter-spacing:1px}
+        .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;padding:12px 16px;gap:12px}
+        .brand{font-weight:800;letter-spacing:1px;font-size:20px}
         .auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-        .auth-card{width:100%;max-width:980px;border-radius:16px;display:grid;grid-template-columns:1fr 1fr;overflow:hidden}
-        .auth-left{background:linear-gradient(135deg,#ff7a7a,#7a8bff);padding:40px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#111}
-        .auth-left h1{font-size:48px;margin:0;letter-spacing:2px;color:white}
+        .auth-card{width:100%;max-width:1100px;border-radius:16px;display:grid;grid-template-columns:1fr 1fr;overflow:hidden}
+        .auth-left{background:linear-gradient(135deg,#ff7a7a,#7a8bff);padding:32px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#111}
+        .auth-left .logo-anim{font-size:44px}
+        .auth-left p{max-width:220px;text-align:center}
         .auth-left p{opacity:0.9}
         .auth-right{padding:28px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent)}
         .auth-form{max-width:360px;margin:0 auto}
-        .auth-form input{width:100%;padding:12px;margin:10px 0;border-radius:10px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit}
+        .auth-form input{width:100%;padding:12px;margin:10px 0;border-radius:12px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit}
         .auth-actions{display:flex;gap:8px;flex-wrap:wrap}
-        .primary{background:var(--accent);color:#fff;padding:10px 14px;border-radius:10px;border:none;cursor:pointer}
-        .ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 10px;border-radius:10px;color:var(--muted);cursor:pointer}
+        .primary{background:var(--accent);color:#fff;padding:10px 14px;border-radius:12px;border:none;cursor:pointer;box-shadow:0 6px 18px rgba(79,154,255,0.12)}
+        .ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 10px;border-radius:12px;color:var(--muted);cursor:pointer}
         .loading-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,rgba(2,6,23,0.6),rgba(2,6,23,0.85));z-index:60}
         .logo-anim{font-size:42px;font-weight:800;letter-spacing:6px;color:transparent;background:linear-gradient(90deg,#fff,#4f9aff,#fff);-webkit-background-clip:text;background-clip:text;animation:logoPulse 1.8s infinite}
         @keyframes logoPulse{0%{filter:blur(0px);transform:translateY(0)}50%{filter:blur(2px);transform:translateY(-6px)}100%{filter:blur(0px);transform:translateY(0)}}
-        .card-glass{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));backdrop-filter: blur(6px);padding:12px;border-radius:12px}
+        .card-glass{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));backdrop-filter: blur(8px);padding:14px;border-radius:14px}
         .overlay{position:fixed;inset:0;background:rgba(2,6,23,0.7);display:flex;align-items:center;justify-content:center;z-index:40}
         .modal{background:#071016;padding:18px;border-radius:12px;width:92%;max-width:760px;animation:pop .18s ease}
         @keyframes pop{from{opacity:0;transform:scale(.98) translateY(6px)}to{opacity:1;transform:none}}
@@ -78,27 +79,36 @@ export default function App() {
         .newpost{display:flex;gap:12px;align-items:flex-start;margin-bottom:16px;padding:12px;border-radius:12px}
         .newpost textarea{width:100%;min-height:64px;padding:10px;border-radius:10px;border:none;background:rgba(255,255,255,0.02);color:inherit}
         .posts{display:flex;flex-direction:column;gap:12px}
-        .post{display:flex;gap:12px;padding:12px;border-radius:12px;transition:transform .28s cubic-bezier(.2,.8,.2,1), box-shadow .28s}
-        .post:hover{transform:translateY(-6px);box-shadow:0 12px 30px rgba(0,0,0,0.6)}
-        .post-left{width:56px}
+        .post{display:flex;gap:12px;padding:14px;border-radius:14px;transition:transform .28s cubic-bezier(.2,.8,.2,1), box-shadow .28s}
+        .post:hover{transform:translateY(-6px);box-shadow:0 18px 40px rgba(0,0,0,0.55)}
+        .post-left{width:64px}
         .post-body{flex:1}
         .post-header{display:flex;justify-content:space-between;align-items:center}
         .post-text{margin:8px 0}
         .actions button,.comment-actions button,.post-controls button{background:transparent;border:none;color:var(--muted);margin-right:6px;cursor:pointer}
         .linkish{background:none;border:none;color:var(--accent);cursor:pointer}
-        .comment{display:flex;gap:8px;padding:8px 0;border-top:1px solid rgba(255,255,255,0.02)}
+        .comment{display:flex;gap:8px;padding:10px 0;border-top:1px solid rgba(255,255,255,0.02)}
         .comment .comment-left{width:40px}
         .comment-body{flex:1}
         .comment-replies{margin-left:40px}
         .comment-box input{width:100%;padding:8px;border-radius:8px;border:none;background:rgba(255,255,255,0.02);color:inherit}
         .muted.small{font-size:12px;color:var(--muted)}
+        .version-note{font-size:12px;color:var(--muted);text-align:center;margin-top:18px}
         .fade-in{animation:fadeIn .25s ease}
         @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-        @media(max-width:900px){
+        @media(max-width:1000px){
           .auth-card{grid-template-columns:1fr;}
-          .auth-left{padding:28px}
-          .topbar{padding:12px}
-          .post{flex-direction:row}
+          .auth-left{padding:22px}
+          .topbar{padding:10px}
+          .post{flex-direction:column;gap:10px}
+          .post-left{width:48px}
+        }
+        @media(max-width:480px){
+          .auth-left{padding:18px}
+          .auth-left .logo-anim{font-size:34px}
+          .post{padding:10px}
+          .post-left{width:44px}
+          .newpost textarea{min-height:56px}
         }
         `;
         document.head.appendChild(style);
@@ -117,6 +127,10 @@ export default function App() {
     const [editingPostId, setEditingPostId] = useState(null);
     const [editText, setEditText] = useState("");
     const [commentInputs, setCommentInputs] = useState({});
+    const [viewTab, setViewTab] = useState('feed'); // 'feed' | 'settings' | 'profile'
+    const [miniProfile, setMiniProfile] = useState(null); // small popup for avatar click
+    const [editingCommentId, setEditingCommentId] = useState(null);
+    const [editingCommentText, setEditingCommentText] = useState('');
 
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -235,20 +249,38 @@ export default function App() {
 
     // AUTH ACTIONS
     const login = async () => {
+        const e = (email || '').trim();
+        const p = password || '';
+        if (!e || !p) return alert('Please enter email and password');
         try {
-            await signInWithEmailAndPassword(auth, email, password);
+            await signInWithEmailAndPassword(auth, e, p);
         } catch (e) {
-            alert(e.message);
+            console.error('login error', e);
+            if (e.code === 'auth/invalid-credential') alert('Invalid credentials provided. Check your input or try Google login.');
+            else alert(e.message || 'Login failed');
         }
     };
 
     const register = async () => {
+        const e = (email || '').trim();
+        const p = password || '';
+        if (!e || !p) return alert('Please enter email and password');
+        if (p.length < 6) return alert('Password must be at least 6 characters');
         try {
-            const res = await createUserWithEmailAndPassword(auth, email, password);
+            const res = await createUserWithEmailAndPassword(auth, e, p);
             // create user doc handled in onAuthStateChanged
             return res;
         } catch (e) {
-            alert(e.message);
+            console.error('register error', e);
+            // Provide actionable guidance for common misconfiguration errors
+            const code = e.code || 'unknown';
+            if (code === 'auth/invalid-credential') {
+                alert(`Registration failed (${code}): Invalid credential.\nPossible causes: Email/Password provider is disabled in Firebase Console, or OAuth provider misconfiguration.\nCheck Firebase Authentication providers and authorized domains.`);
+            } else if (code === 'auth/network-request-failed') {
+                alert('Network error. Check your connection and try again.');
+            } else {
+                alert(`${code}: ${e.message || 'Registration failed'}`);
+            }
         }
     };
 
@@ -256,7 +288,8 @@ export default function App() {
         try {
             await signInAnonymously(auth);
         } catch (e) {
-            alert(e.message);
+            console.error('guest login error', e);
+            alert(e.message || 'Guest login failed');
         }
     };
 
@@ -264,7 +297,13 @@ export default function App() {
         try {
             await signInWithPopup(auth, new GoogleAuthProvider());
         } catch (e) {
-            alert(e.message);
+            console.error('google login error', e);
+            const code = e.code || 'unknown';
+            if (code === 'auth/invalid-credential') {
+                alert(`Google login failed (${code}). Possible causes: OAuth client misconfiguration or unauthorized domain.\nOpen Firebase Console -> Authentication -> Sign-in method and ensure Google is enabled and your domain is authorized.`);
+            } else {
+                alert(`${code}: ${e.message || 'Google login failed'}`);
+            }
         }
     };
 
@@ -285,6 +324,7 @@ export default function App() {
         setDescriptionInput(u.description || "");
         setAvatarPreview(u.photoURL || user.photoURL || null);
         setAvatarFile(null);
+        setProfileUser({ uid: user.uid, name: u.name || user.displayName || null, username: u.username || null, description: u.description || null, photoURL: u.photoURL || user.photoURL || null });
         setProfileOpen(true);
     };
 
@@ -470,8 +510,8 @@ export default function App() {
 
     const container = {
         minHeight: "100vh",
-        padding: 20,
-        maxWidth: 900,
+        padding: '20px 12px',
+        maxWidth: 1100,
         margin: "0 auto",
         background: theme === "dark" ? "#0f0f0f" : "#f5f5f5",
         color: theme === "dark" ? "#fff" : "#000",
@@ -484,8 +524,8 @@ export default function App() {
             <div className="auth-screen">
                 <div className="auth-card">
                     <div className="auth-left">
-                        <h1>Mideal</h1>
-                        <p>Share moments. Connect easily.</p>
+                        <div className="logo-anim">Mideal</div>
+                        <p style={{marginTop:12}}>Share moments. Connect easily.</p>
                     </div>
                     <div className="auth-right">
                         <div className="auth-form card-glass">
@@ -511,20 +551,32 @@ export default function App() {
     }
 
     return (
-        <div style={container}>
+        <div style={{...container, position: 'relative'}}>
+            {loading && (
+                <div className="loading-overlay">
+                    <div style={{textAlign:'center'}}>
+                        <div className="logo-anim">Mideal</div>
+                        <div className="muted small" style={{marginTop:8}}>Loading...</div>
+                    </div>
+                </div>
+            )}
             {/* HEADER */}
-            <div className="topbar">
-                <h2>Mideal beta</h2>
+            <div className="topbar card-glass" style={{alignItems:'center'}}>
+                <div style={{display:'flex',alignItems:'center',gap:12}}>
+                    <div className="brand">Mideal</div>
+                    <div className="muted small">v0.1</div>
+                </div>
 
-                <div style={{ display: "flex", gap: 10 }}>
-                    <button onClick={() => setSettingsOpen(true)}>settings</button>
-                    <button onClick={openProfile}>profile</button>
-                    <button onClick={logout}>logout</button>
+                <div style={{ display: "flex", gap: 10, alignItems:'center' }}>
+                    <button className="ghost" onClick={() => setViewTab('feed')}>Feed</button>
+                    <button className="ghost" onClick={() => setViewTab('profile')}>Profile</button>
+                    <button className="ghost" onClick={() => setViewTab('settings')}>Settings</button>
+                    <button className="ghost" onClick={logout}>Logout</button>
                 </div>
             </div>
 
-            {/* SETTINGS */}
-            {settingsOpen && (
+            {/* SETTINGS / PROFILE as separate tabs */}
+            {viewTab === 'settings' && (
                 <div className="overlay">
                     <div className="modal">
                         <h3>Settings</h3>
@@ -548,7 +600,7 @@ export default function App() {
                             <div className="toggle">
                                 <div style={{fontWeight:700}}>Account</div>
                                 <div style={{marginLeft:'auto'}}>
-                                    <button className="ghost" onClick={openProfile}>Profile</button>
+                                    <button className="ghost" onClick={() => { setViewTab('profile'); setProfileOpen(true); }}>Profile</button>
                                 </div>
                             </div>
 
@@ -561,52 +613,55 @@ export default function App() {
                         </div>
 
                         <div style={{marginTop:12, textAlign:'right'}}>
-                            <button onClick={() => setSettingsOpen(false)} className="ghost">Close</button>
+                            <button onClick={() => setViewTab('feed')} className="ghost">Close</button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {profileOpen && (
+            {profileOpen && profileUser && (
                 <div className="overlay">
                     <div className="modal" style={{ maxWidth: 600 }}>
                         <h3>Profile</h3>
 
                         <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
                             <div style={{ width: 140 }}>
-                                <div style={{ width: 120, height: 120, borderRadius: 8, overflow: "hidden", background: "#eee" }}>
-                                    {avatarPreview ? (
-                                        <img src={avatarPreview} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                <div style={{ width: 120, height: 120, borderRadius: 12, overflow: "hidden", background: "#eee" }}>
+                                    {profileUser.photoURL ? (
+                                        <img src={profileUser.photoURL} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                                     ) : (
-                                        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#666" }}>No avatar</div>
+                                        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#666" }}>{(profileUser.name||profileUser.username||'U')[0]}</div>
                                     )}
                                 </div>
-                                <div style={{ marginTop: 8 }}>
-                                    <input type="file" accept="image/*" onChange={handleAvatarChange} />
-                                </div>
+                                {profileUser.uid === user?.uid && (
+                                    <div style={{ marginTop: 8 }}>
+                                        <input type="file" accept="image/*" onChange={handleAvatarChange} />
+                                    </div>
+                                )}
                             </div>
 
                             <div style={{ flex: 1 }}>
                                 <div style={{ marginBottom: 8 }}>
-                                    <label style={{ display: "block", fontSize: 12, color: "#666" }}>Name</label>
-                                    <input value={nameInput} onChange={(e) => setNameInput(e.target.value)} />
+                                    <div style={{ display: "block", fontSize: 14, color: "#fff", fontWeight:700 }}>{profileUser.name || 'User'}</div>
+                                    <div className="muted small">@{profileUser.username || profileUser.uid}</div>
                                 </div>
 
                                 <div style={{ marginBottom: 8 }}>
-                                    <label style={{ display: "block", fontSize: 12, color: "#666" }}>Username</label>
-                                    <input value={usernameInput} onChange={(e) => setUsernameInput(e.target.value)} />
+                                    <div style={{ fontSize: 13, color: '#ddd' }}>{profileUser.description || 'No description'}</div>
                                 </div>
 
-                                <div style={{ marginBottom: 8 }}>
-                                    <label style={{ display: "block", fontSize: 12, color: "#666" }}>Description</label>
-                                    <textarea value={descriptionInput} onChange={(e) => setDescriptionInput(e.target.value)} rows={4} style={{ width: "100%" }} />
-                                </div>
-
-                                <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                                    <button onClick={saveProfile} disabled={uploading}>{uploading ? "Saving..." : "Save"}</button>
-                                    <button onClick={() => setProfileOpen(false)}>Close</button>
-                                    <button onClick={deleteAccount} style={{ marginLeft: "auto", color: "#900" }}>Delete account</button>
-                                </div>
+                                {profileUser.uid === user?.uid ? (
+                                    <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                                        <button className="primary" onClick={saveProfile} disabled={uploading}>{uploading ? "Saving..." : "Save"}</button>
+                                        <button onClick={() => setProfileOpen(false)} className="ghost">Close</button>
+                                        <button onClick={deleteAccount} className="ghost" style={{ marginLeft: "auto", color: "#900" }}>Delete account</button>
+                                    </div>
+                                ) : (
+                                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                                        <button className="primary" onClick={() => alert('Follow not implemented')}>Follow</button>
+                                        <button className="ghost" onClick={() => setProfileOpen(false)}>Close</button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -641,10 +696,14 @@ export default function App() {
                             </div>
                         </div>
                         <div className="post-body">
-                            <div className="post-header">
+                        <div className="post-header">
                                 <div>
-                                    <strong style={{ display: "block" }}>{p.authorName || usersMap[p.uid]?.name || "User"}</strong>
-                                    <div className="muted small">{new Date(p.createdAt).toLocaleString()}</div>
+                                    <div style={{display: 'flex', alignItems: 'center', gap: 10}}>
+                                        <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
+                                            <button className="linkish" onClick={async () => { const uSnap = await getDoc(doc(db, 'users', p.uid)); if (uSnap.exists()) setMiniProfile({ uid: p.uid, ...uSnap.data() }); }}>{p.authorName || usersMap[p.uid]?.name || "User"}</button>
+                                            <div className="muted small">{new Date(p.createdAt).toLocaleString()}</div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div className="post-controls">
                                     <button onClick={() => toggleLike(p)}>👍 {p.likes?.length || 0}</button>
@@ -678,14 +737,32 @@ export default function App() {
                                                 </div>
                                             </div>
                                             <div className="comment-body">
-                                                <div className="comment-meta">
-                                                    <button className="linkish" onClick={async ()=>{ const uSnap = await getDoc(doc(db,'users',c.uid)); if(uSnap.exists()) setProfileUser({uid:c.uid,...uSnap.data()}); setProfileOpen(true); }}>{c.authorName}</button>
+                                                <div className="comment-meta" style={{display:'flex',gap:8,alignItems:'center'}}>
+                                                    <button className="linkish" onClick={async ()=>{ const uSnap = await getDoc(doc(db,'users',c.uid)); if(uSnap.exists()) setMiniProfile({uid:c.uid,...uSnap.data()}); }}>{c.authorName}</button>
                                                     <span className="small muted"> · {new Date(c.createdAt).toLocaleString()}</span>
+                                                    {c.uid === user?.uid && (
+                                                        <div style={{marginLeft:'auto',display:'flex',gap:6}}>
+                                                            <button className="ghost" onClick={()=>{ setEditingCommentId(c.id); setEditingCommentText(c.text); }}>edit</button>
+                                                            <button className="ghost" onClick={async ()=>{ if(!confirm('Delete this comment?')) return; await deleteDoc(doc(db,'posts',p.id,'comments',c.id)); const cSnap = await getDocs(collection(db,'posts',p.id,'comments')); setCommentsMap(m=>({...m,[p.id]:cSnap.docs.map(d=>({id:d.id,...d.data()}))})); }}>delete</button>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <div className="comment-text">{c.text}</div>
+                                                <div className="comment-text">
+                                                    {editingCommentId === c.id ? (
+                                                        <div>
+                                                            <input value={editingCommentText} onChange={(e)=>setEditingCommentText(e.target.value)} />
+                                                            <div style={{textAlign:'right',marginTop:6}}>
+                                                                <button className="primary" onClick={async ()=>{ await updateDoc(doc(db,'posts',p.id,'comments',c.id),{text:editingCommentText}); setEditingCommentId(null); const cSnap = await getDocs(collection(db,'posts',p.id,'comments')); setCommentsMap(m=>({...m,[p.id]:cSnap.docs.map(d=>({id:d.id,...d.data()}))})); }}>Save</button>
+                                                                <button onClick={()=>setEditingCommentId(null)}>Cancel</button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        c.text
+                                                    )}
+                                                </div>
                                                 <div className="comment-actions">
-                                                    <button onClick={async ()=>{ const uid = user?.uid; if(!uid) return alert('Login to like'); let likes=c.likes||[]; let dislikes=c.dislikes||[]; if(likes.includes(uid)) likes=likes.filter(x=>x!==uid); else{likes.push(uid);dislikes=dislikes.filter(x=>x!==uid);} await updateDoc(doc(db,'posts',p.id,'comments',c.id),{likes,dislikes}); const cSnap = await getDocs(collection(db,'posts',p.id,'comments')); setCommentsMap(m=>({...m,[p.id]:cSnap.docs.map(d=>({id:d.id,...d.data()}))})); }}>👍 {c.likes?.length||0}</button>
-                                                    <button onClick={async ()=>{ const uid = user?.uid; if(!uid) return alert('Login to dislike'); let likes=c.likes||[]; let dislikes=c.dislikes||[]; if(dislikes.includes(uid)) dislikes=dislikes.filter(x=>x!==uid); else{dislikes.push(uid);likes=likes.filter(x=>x!==uid);} await updateDoc(doc(db,'posts',p.id,'comments',c.id),{likes,dislikes}); const cSnap = await getDocs(collection(db,'posts',p.id,'comments')); setCommentsMap(m=>({...m,[p.id]:cSnap.docs.map(d=>({id:d.id,...d.data()}))})); }}>👎 {c.dislikes?.length||0}</button>
+                                                    <button onClick={async ()=>{ const uid = user?.uid; if(!uid) return alert('Login to like'); try{ let likes=c.likes||[]; let dislikes=c.dislikes||[]; if(likes.includes(uid)) likes=likes.filter(x=>x!==uid); else{likes.push(uid);dislikes=dislikes.filter(x=>x!==uid);} await updateDoc(doc(db,'posts',p.id,'comments',c.id),{likes,dislikes}); const cSnap = await getDocs(collection(db,'posts',p.id,'comments')); setCommentsMap(m=>({...m,[p.id]:cSnap.docs.map(d=>({id:d.id,...d.data()}))})); }catch(e){console.error(e);alert('Failed to update like')} }}>👍 {c.likes?.length||0}</button>
+                                                    <button onClick={async ()=>{ const uid = user?.uid; if(!uid) return alert('Login to dislike'); try{ let likes=c.likes||[]; let dislikes=c.dislikes||[]; if(dislikes.includes(uid)) dislikes=dislikes.filter(x=>x!==uid); else{dislikes.push(uid);likes=likes.filter(x=>x!==uid);} await updateDoc(doc(db,'posts',p.id,'comments',c.id),{likes,dislikes}); const cSnap = await getDocs(collection(db,'posts',p.id,'comments')); setCommentsMap(m=>({...m,[p.id]:cSnap.docs.map(d=>({id:d.id,...d.data()}))})); }catch(e){console.error(e);alert('Failed to update dislike')} }}>👎 {c.dislikes?.length||0}</button>
                                                     <button onClick={()=>{ setCommentInputs(inputs=>({...inputs,[p.id]:{text:'',parentId:c.id}})); }}>reply</button>
                                                 </div>
 
@@ -721,3 +798,4 @@ export default function App() {
         </div>
     );
 }
+ 
