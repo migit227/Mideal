@@ -137,6 +137,40 @@ export default function App() {
         });
     }, []);
 
+    // Subscribe to current user's document to get steam updates pushed from server-side linking
+    useEffect(() => {
+        if (!user) return;
+        const uRef = doc(db, 'users', user.uid);
+        const unsub = onSnapshot(uRef, (snap) => {
+            if (!snap.exists()) return;
+            const d = snap.data();
+            if (d.steam) {
+                setSteamData(d.steam);
+                const g = d.steam.games && (d.steam.games[730] || d.steam.games['730']);
+                if (g) setCsHours(Math.round(g.playtime_hours || g.playtime / 60 || 0));
+                if (typeof d.steam.hasPrime !== 'undefined') setHasPrime(!!d.steam.hasPrime);
+            }
+        });
+        return () => unsub();
+    }, [user]);
+
+    // Initiate Steam OpenID flow: server will verify Firebase ID token and link Steam account server-side
+    const linkSteam = async () => {
+        if (!user) return alert('Сначала войдите в аккаунт');
+        try {
+            const idToken = await user.getIdToken();
+            // Inform server to store uid in session for linking
+            const proxy = process.env.REACT_APP_STEAM_PROXY || 'http://localhost:3001';
+            await fetch(`${proxy}/initLink`, {
+                method: 'POST', headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ idToken })
+            });
+            // Open Steam auth in popup
+            const w = window.open(`${proxy}/auth/steam`, 'steam_auth', 'width=900,height=700');
+            if (!w) alert('Поп-ап заблокирован, разрешите всплывающие окна и попробуйте снова.');
+        } catch (err) { console.error(err); alert('Не удалось начать привязку Steam'); }
+    };
+
     const loadFriends = async () => {
         // simple friends list: users where isFriendWith current user (field friends: [uid]) OR we can implement searching
         const q = query(collection(db, 'users'), orderBy('nickname'));
@@ -506,17 +540,28 @@ export default function App() {
                                 }}>{t.save === 'Сохранить' ? 'Привязать Steam' : 'Привязать Steam'}</button>
                             </div>
                             {showSteamGuide && (
-                                <div style={{ marginTop: 12, background: 'rgba(255,255,255,0.04)', padding: 12, borderRadius: 8 }}>
-                                    <h4 style={{ margin: '6px 0' }}>Как привязать Steam</h4>
-                                    <ol style={{ paddingLeft: 18, marginTop: 6 }}>
-                                        <li>Откройте свой профиль в Steam и скопируйте SteamID64 (числовой) или vanity (адрес после /id/).</li>
-                                        <li>Если у вас vanity (напр. "username"), можно использовать кнопку «Привязать Steam» — сайт попытается преобразовать vanity в SteamID64 автоматически.</li>
-                                        <li>Вставьте полученный SteamID64 или vanity в поле "Steam ID64" и нажмите «Привязать Steam».</li>
-                                        <li>Если данные о играх не подтянулись — убедитесь, что профиль публичный: Профиль → Редактировать профиль → Сделать профиль публичным.</li>
-                                        <li>После успешной привязки сайт загрузит часы в играх; для входа в подбор требуется минимум 15 часов в соответствующей игре.</li>
+                                <div style={{ marginTop: 12, background: 'rgba(255,255,255,0.04)', padding: 14, borderRadius: 10 }}>
+                                    <h4 style={{ margin: '6px 0' }}>Как привязать Steam — пошагово</h4>
+                                    <ol style={{ paddingLeft: 18, marginTop: 8 }}>
+                                        <li>Зайдите на свою страницу в Steam и скопируйте ссылку на профиль (из адресной строки).</li>
+                                        <li>Откройте сайт <a href="https://steamid.xyz/" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>https://steamid.xyz/</a> и вставьте ссылку профиля — сайт выдаст ваш SteamID64.</li>
+                                        <li>Скопируйте SteamID64 (числовой идентификатор).</li>
+                                        <li>Вставьте SteamID64 в поле "Steam ID64" на этом сайте и нажмите «Привязать Steam» (или кнопку подтверждения).</li>
+                                        <li>Если нужно получить Steam API Key (для разработчиков), посетите <a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>https://steamcommunity.com/dev/apikey</a> и следуйте инструкциям.</li>
                                     </ol>
-                                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                                        <button className="btn" onClick={() => { if (!process.env.REACT_APP_STEAM_API_KEY) { alert('Для прямой привязки Steam API ключ не настроен. См. документацию или используйте vanity/SteamID64 и попробуйте снова.'); } else fetchSteamData(steamID); }}>Привязать Steam</button>
+                                    <div style={{ marginTop: 10, fontSize: 13 }}>
+                                        <b>Если что-то не работает:</b>
+                                        <ul style={{ marginTop: 6, paddingLeft: 18 }}>
+                                            <li>Проверьте, что ваш профиль в Steam публичный: <a href="https://steamcommunity.com/settings/profile" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>Открыть настройки профиля</a>.</li>
+                                            <li>Убедитесь, что локальный прокси запущен и доступен (если вы используете локальную разработку): запустите functions/proxy-server/index.js и проверьте, что он слушает порт 3001.</li>
+                                            <li>Проверьте, что в окружении указан REACT_APP_STEAM_PROXY (например http://localhost:3001) и прокси имеет STEAM_API_KEY в переменных среды.</li>
+                                            <li>Если вы используете серверную привязку, убедитесь, что прокси настроен с FIREBASE_SERVICE_ACCOUNT и имеет доступ к Firestore.</li>
+                                            <li>Откройте DevTools → Console / Network, посмотрите ошибки CORS, сети или ответы от прокси — они помогут понять причину.</li>
+                                            <li>Если автоматический поиск не находит аккаунт — используйте steamid.xyz, скопируйте SteamID64 и вставьте вручную.</li>
+                                        </ul>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                                        <button className="btn" onClick={() => { if (!process.env.REACT_APP_STEAM_PROXY) { alert('Прокси не настроен. Убедитесь, что REACT_APP_STEAM_PROXY задан.'); } else fetchSteamData(steamID); }}>Привязать Steam</button>
                                         <button className="btn" style={{ background: '#6b6bff' }} onClick={() => autoFindSteamId(nick)}>Найти по нику</button>
                                         <button className="btn btn-gray" onClick={() => setShowSteamGuide(false)}>Закрыть</button>
                                     </div>
