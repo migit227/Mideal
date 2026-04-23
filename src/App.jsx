@@ -146,41 +146,36 @@ export default function App() {
 
     // Fetch Steam data using Steam Web API. Requires REACT_APP_STEAM_API_KEY to be set in env.
     const fetchSteamData = async (steamIdInput) => {
-        const key = process.env.REACT_APP_STEAM_API_KEY;
+        const proxy = process.env.REACT_APP_STEAM_PROXY || 'http://localhost:3001';
         if (!user) return alert('Сначала войдите в аккаунт');
-        if (!key) return alert('Steam API key not configured (REACT_APP_STEAM_API_KEY)');
         if (!steamIdInput) return alert('Укажите Steam ID64 или vanity URL в профиле');
         try {
             let steamId64 = steamIdInput.trim();
-            // If input is not numeric, try to resolve vanity URL
+            // If input is not numeric, try to resolve vanity URL via proxy
             if (!/^\d+$/.test(steamId64)) {
-                const rv = await fetch(`https://api.steampowered.com/ISteamUser/ResolveVanityURL/v1/?key=${key}&vanityurl=${encodeURIComponent(steamId64)}`).then(r => r.json());
+                const rv = await fetch(`${proxy}/resolveVanity?vanity=${encodeURIComponent(steamId64)}`).then(r => r.json());
                 if (rv.response && rv.response.success === 1) steamId64 = rv.response.steamid;
                 else return alert('Не удалось преобразовать vanity URL в SteamID64. Введите числовой SteamID64 или убедитесь, что vanity корректен.');
             }
 
-            // Get player summary (avatar, name)
-            const ps = await fetch(`https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${key}&steamids=${steamId64}`).then(r => r.json());
+            // Get player summary via proxy
+            const ps = await fetch(`${proxy}/getPlayerSummaries?steamids=${steamId64}`).then(r => r.json());
             const player = ps.response.players && ps.response.players[0];
 
-            // Get owned games with playtime
-            const og = await fetch(`https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${key}&steamid=${steamId64}&include_appinfo=1&include_played_free_games=1`).then(r => r.json());
+            // Get owned games via proxy
+            const og = await fetch(`${proxy}/getOwnedGames?steamid=${steamId64}`).then(r => r.json());
             const gamesArr = (og.response && og.response.games) || [];
 
-            // If gamesArr is empty, profile might be private
             if (!gamesArr.length) {
-                // still save basic info but warn user
-                const steamInfoBasic = { steamId: steamId64, persona: player?.personaname || null, avatar: player?.avatarfull || player?.avatar || null, games: {}, hasPrime: false, fetchedAt: Date.now(), cs_hours: 0, verified: false };
+                const steamInfoBasic = { steamId: steamId64, persona: player?.personaname || null, avatar: player?.avatarfull || player?.avatar || null, games: {}, hasPrime: false, fetchedAt: Date.now(), cs_hours: 0 };
                 await updateDoc(doc(db, 'users', user.uid), { steam: steamInfoBasic });
                 setSteamData(steamInfoBasic);
                 return alert('Профиль Steam приватный или нет доступных данных о играх. Сделайте профиль открытым и попробуйте снова.');
             }
 
-            // Convert to map by appid and compute hours
             const games = {};
             gamesArr.forEach(g => { games[g.appid] = { appid: g.appid, name: g.name, playtime: g.playtime_forever || 0, playtime_hours: Math.round((g.playtime_forever||0)/60) }; });
 
-            // Approximate prime: check names mentioning 'prime'
             let prime = false;
             for (const k of Object.keys(games)) {
                 const n = (games[k].name||'').toLowerCase();
@@ -196,20 +191,42 @@ export default function App() {
                 fetchedAt: Date.now()
             };
 
-            // Compute cs_hours for appid 730
             const cs = games[730];
             steamInfo.cs_hours = cs ? (cs.playtime_hours || Math.round((cs.playtime||0)/60)) : 0;
 
-            // Save to Firestore
             await updateDoc(doc(db, 'users', user.uid), { steam: steamInfo });
             setSteamData(steamInfo);
-            // set csHours and hasPrime locally
             if (steamInfo.cs_hours) setCsHours(steamInfo.cs_hours);
             setHasPrime(!!steamInfo.hasPrime);
-            alert('Steam аккаунт привязан. Данные загружены. Если профиль был приватным, откройте его и попробуйте снова для полной информации.');
+            alert('Steam аккаунт привязан. Данные загружены.');
         } catch (err) {
             console.error(err);
-            alert('Ошибка при обращении к Steam API');
+            alert('Ошибка при обращении к Steam API через прокси');
+        }
+    };
+
+    // Try to automatically find SteamID64 by display name using Steam community search as a best-effort.
+    // Note: Steam may block cross-origin requests; this function will handle failures and show a helpful message.
+    const autoFindSteamId = async (name) => {
+        if (!name || !name.trim()) return alert('Введите никнейм для поиска');
+        const proxy = process.env.REACT_APP_STEAM_PROXY || 'http://localhost:3001';
+        try {
+            const maybeVanity = name.trim();
+            // try vanity via proxy
+            if (!/^\d+$/.test(maybeVanity)) {
+                const rv = await fetch(`${proxy}/resolveVanity?vanity=${encodeURIComponent(maybeVanity)}`).then(r => r.json());
+                if (rv.response && rv.response.success === 1) {
+                    const steamid = rv.response.steamid;
+                    setSteamID(steamid);
+                    return fetchSteamData(steamid);
+                }
+            }
+
+            // If vanity resolution didn't help, attempt search via Steam proxy (note: steamcommunity scraping via proxy not implemented)
+            alert('Автоматический поиск ограничен: попробуйте вставить vanity или SteamID64 вручную. Для полной автоматизации настрою серверный поиск.');
+        } catch (err) {
+            console.error(err);
+            alert('Автоматический поиск через прокси не удался. Вручную вставьте SteamID64 или vanity.');
         }
     };
 
@@ -448,6 +465,7 @@ export default function App() {
                                     </ol>
                                     <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                                         <button className="btn" onClick={() => { if (!process.env.REACT_APP_STEAM_API_KEY) { alert('Для прямой привязки Steam API ключ не настроен. См. документацию или используйте vanity/SteamID64 и попробуйте снова.'); } else fetchSteamData(steamID); }}>Привязать Steam</button>
+                                        <button className="btn" style={{ background: '#6b6bff' }} onClick={() => autoFindSteamId(nick)}>Найти по нику</button>
                                         <button className="btn btn-gray" onClick={() => setShowSteamGuide(false)}>Закрыть</button>
                                     </div>
                                 </div>
