@@ -1,801 +1,498 @@
 import { useEffect, useState, useRef } from "react";
 import { db } from "./firebase";
-
 import {
-    collection,
-    addDoc,
-    // getDocs,
-    getDocs,
-    query,
-    orderBy,
-    doc,
-    setDoc,
-    getDoc,
-    updateDoc,
-    deleteDoc,
-    onSnapshot,
+    collection, addDoc, getDocs, query, orderBy, doc, setDoc, getDoc,
+    updateDoc, deleteDoc, onSnapshot, where, limit
 } from "firebase/firestore";
-
 import {
-    getAuth,
-    onAuthStateChanged,
-    signInWithEmailAndPassword,
-    createUserWithEmailAndPassword,
-    signInAnonymously,
-    signOut,
-    GoogleAuthProvider,
-    signInWithPopup,
-    updateProfile,
-    deleteUser,
+    getAuth, onAuthStateChanged, signInWithEmailAndPassword,
+    createUserWithEmailAndPassword, signOut, GoogleAuthProvider,
+    signInWithPopup, deleteUser
 } from "firebase/auth";
-
 import {
-    getStorage,
-    ref as storageRef,
-    uploadBytes,
-    getDownloadURL,
-    deleteObject,
+    getStorage, ref as storageRef, uploadBytes, getDownloadURL
 } from "firebase/storage";
+
+const translations = {
+    ru: {
+        games: "Игры", profile: "Профиль", settings: "Настройки", logout: "Выйти",
+        friends: "Друзья", feed: "Лента", search: "Найти", save: "Сохранить",
+        theme: "Тема", lang: "Язык", age: "Возраст", steamId: "Steam ID64",
+        nickname: "Никнейм", uploadPhoto: "Загрузить фото", matchCS2: "Подбор CS2",
+        hours: "Часов в CS2", skill: "Скилл", hasPrime: "Прайм-статус",
+        joinQueue: "В очередь", leaveQueue: "Покинуть очередь", back: "Назад",
+        privacy: "Приватность", status: "Статус", statusReady: "Готов",
+        ranks: ["Silver", "Gold Nova", "Master Guardian", "Global Elite", "1000-5000 ELO", "5000-15000 ELO", "20000+ ELO"]
+    }
+};
 
 export default function App() {
     const auth = getAuth();
+    const storage = getStorage();
+    const [user, setUser] = useState(null);
+    const [step, setStep] = useState("loading");
+    const [activeTab, setActiveTab] = useState("games");
+    const [selectedGame, setSelectedGame] = useState(null);
+    const [settingsSubTab, setSettingsSubTab] = useState("general");
 
-    // inject minimal styles (avoids adding separate CSS file)
+    // Данные профиля и настроек
+    const [lang, setLang] = useState("ru");
+    const [theme, setTheme] = useState("dark");
+    const [nick, setNick] = useState("");
+    const [steamID, setSteamID] = useState("");
+    const [age, setAge] = useState("");
+    const [avatar, setAvatar] = useState("");
+    const [userStatus, setUserStatus] = useState("ready");
+    const [privacyAge, setPrivacyAge] = useState(false);
+
+    // Социалка (Посты, Комменты, Друзья)
+    const [posts, setPosts] = useState([]);
+    const [usersMap, setUsersMap] = useState({});
+    const [friends, setFriends] = useState([]);
+    const [friendQuery, setFriendQuery] = useState('');
+    const [commentsMap, setCommentsMap] = useState({});
+    const [commentInputs, setCommentInputs] = useState({});
+
+    // Подбор CS2
+    const [csSkill, setCsSkill] = useState("Silver");
+    const [csHours, setCsHours] = useState("");
+    const [hasPrime, setHasPrime] = useState(true);
+    const [steamData, setSteamData] = useState(null);
+    const [showSteamGuide, setShowSteamGuide] = useState(false);
+    const [lobby, setLobby] = useState([]);
+    const [myQueueId, setMyQueueId] = useState(null);
+
+    // Модалки и загрузка
+    const [uploading, setUploading] = useState(false);
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const t = translations[lang] || translations.ru;
+
     useEffect(() => {
-        const id = 'mideal-styles';
+        const id = 'mideal-full-v5';
         if (document.getElementById(id)) return;
         const style = document.createElement('style');
         style.id = id;
         style.innerHTML = `
-        :root{--bg:#0b0f15;--accent:#4f9aff;--muted:#9aa6b2;--glass:rgba(255,255,255,0.03);}
-        *{box-sizing:border-box}
-        body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:#e6eef8;-webkit-font-smoothing:antialiased}
-        .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;padding:12px 16px;gap:12px}
-        .brand{font-weight:800;letter-spacing:1px;font-size:20px}
-        .auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-        .auth-card{width:100%;max-width:1100px;border-radius:16px;display:grid;grid-template-columns:1fr 1fr;overflow:hidden}
-        .auth-left{background:linear-gradient(135deg,#ff7a7a,#7a8bff);padding:32px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#111}
-        .auth-left .logo-anim{font-size:44px}
-        .auth-left p{max-width:220px;text-align:center}
-        .auth-left p{opacity:0.9}
-        .auth-right{padding:28px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent)}
-        .auth-form{max-width:360px;margin:0 auto}
-        .auth-form input{width:100%;padding:12px;margin:10px 0;border-radius:12px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit}
-        .auth-actions{display:flex;gap:8px;flex-wrap:wrap}
-        .primary{background:var(--accent);color:#fff;padding:10px 14px;border-radius:12px;border:none;cursor:pointer;box-shadow:0 6px 18px rgba(79,154,255,0.12)}
-        .ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 10px;border-radius:12px;color:var(--muted);cursor:pointer}
-        .loading-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,rgba(2,6,23,0.6),rgba(2,6,23,0.85));z-index:60}
-        .logo-anim{font-size:42px;font-weight:800;letter-spacing:6px;color:transparent;background:linear-gradient(90deg,#fff,#4f9aff,#fff);-webkit-background-clip:text;background-clip:text;animation:logoPulse 1.8s infinite}
-        @keyframes logoPulse{0%{filter:blur(0px);transform:translateY(0)}50%{filter:blur(2px);transform:translateY(-6px)}100%{filter:blur(0px);transform:translateY(0)}}
-        .card-glass{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));backdrop-filter: blur(8px);padding:14px;border-radius:14px}
-        .overlay{position:fixed;inset:0;background:rgba(2,6,23,0.7);display:flex;align-items:center;justify-content:center;z-index:40}
-        .modal{background:#071016;padding:18px;border-radius:12px;width:92%;max-width:760px;animation:pop .18s ease}
-        @keyframes pop{from{opacity:0;transform:scale(.98) translateY(6px)}to{opacity:1;transform:none}}
-        .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-        .toggle{display:flex;align-items:center;gap:8px;padding:10px;border-radius:10px;background:var(--glass)}
-        .avatar-large{width:96px;height:96px;border-radius:12px;overflow:hidden;background:#091018;display:flex;align-items:center;justify-content:center}
-        .avatar-small,.avatar{width:40px;height:40px;border-radius:10px;overflow:hidden;background:#091018;display:flex;align-items:center;justify-content:center}
-        .initial{font-weight:700;color:var(--muted)}
-        .newpost{display:flex;gap:12px;align-items:flex-start;margin-bottom:16px;padding:12px;border-radius:12px}
-        .newpost textarea{width:100%;min-height:64px;padding:10px;border-radius:10px;border:none;background:rgba(255,255,255,0.02);color:inherit}
-        .posts{display:flex;flex-direction:column;gap:12px}
-        .post{display:flex;gap:12px;padding:14px;border-radius:14px;transition:transform .28s cubic-bezier(.2,.8,.2,1), box-shadow .28s}
-        .post:hover{transform:translateY(-6px);box-shadow:0 18px 40px rgba(0,0,0,0.55)}
-        .post-left{width:64px}
-        .post-body{flex:1}
-        .post-header{display:flex;justify-content:space-between;align-items:center}
-        .post-text{margin:8px 0}
-        .actions button,.comment-actions button,.post-controls button{background:transparent;border:none;color:var(--muted);margin-right:6px;cursor:pointer}
-        .linkish{background:none;border:none;color:var(--accent);cursor:pointer}
-        .comment{display:flex;gap:8px;padding:10px 0;border-top:1px solid rgba(255,255,255,0.02)}
-        .comment .comment-left{width:40px}
-        .comment-body{flex:1}
-        .comment-replies{margin-left:40px}
-        .comment-box input{width:100%;padding:8px;border-radius:8px;border:none;background:rgba(255,255,255,0.02);color:inherit}
-        .muted.small{font-size:12px;color:var(--muted)}
-        .version-note{font-size:12px;color:var(--muted);text-align:center;margin-top:18px}
-        .fade-in{animation:fadeIn .25s ease}
-        @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-        @media(max-width:1000px){
-          .auth-card{grid-template-columns:1fr;}
-          .auth-left{padding:22px}
-          .topbar{padding:10px}
-          .post{flex-direction:column;gap:10px}
-          .post-left{width:48px}
-        }
-        @media(max-width:480px){
-          .auth-left{padding:18px}
-          .auth-left .logo-anim{font-size:34px}
-          .post{padding:10px}
-          .post-left{width:44px}
-          .newpost textarea{min-height:56px}
-        }
+            :root { --bg: #0b0e11; --card: #15191c; --border: #2d3339; --text: #fff; --accent: #4f9aff; }
+            * { transition: 0.3s ease; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+            body { margin: 0; background: var(--bg); color: var(--text); overflow: hidden; }
+            .app-grid { display: grid; grid-template-columns: 280px 1fr 300px; height: 100vh; }
+            .sidebar { background: var(--card); border-right: 1px solid var(--border); padding: 25px; display: flex; flex-direction: column; overflow-y: auto; }
+            .main-view { padding: 40px; overflow-y: auto; background: var(--bg); display: flex; flex-direction: column; align-items: center; }
+            .card { background: var(--card); border: 1px solid var(--border); padding: 25px; border-radius: 24px; margin-bottom: 20px; width: 100%; }
+            .menu-btn { padding: 14px 18px; border-radius: 16px; cursor: pointer; margin-bottom: 5px; color: #8e959e; display: flex; align-items: center; gap: 12px; }
+            .menu-btn.active { background: var(--accent); color: white; }
+            .game-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; width: 100%; }
+            .game-card { cursor: pointer; text-align: center; background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 15px; }
+            .game-card:hover { border-color: var(--accent); transform: translateY(-5px); }
+            .btn { padding: 12px 20px; border-radius: 12px; border: none; cursor: pointer; font-weight: bold; background: var(--accent); color: white; }
+            .btn-gray { background: var(--border); color: var(--text); }
+            .btn-danger { background: #ff4f4f; }
+            input, select { width: 100%; padding: 12px; margin: 8px 0; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: white; }
+            .post-card { background: var(--card); border-radius: 20px; padding: 20px; margin-bottom: 15px; }
+            .avatar-img { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; }
+            /* Animations and improved visuals */
+            .fade-in { animation: fadeIn 350ms ease both; }
+            @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+            .btn { transition: transform 160ms ease, box-shadow 160ms ease; }
+            .btn:active { transform: translateY(1px); }
+            .menu-btn { transition: background 220ms ease, transform 160ms ease; }
+            .menu-btn:hover { transform: translateX(6px); }
+            .game-card { transition: transform 260ms cubic-bezier(.2,.9,.2,1), box-shadow 260ms; }
+            .game-card:hover { transform: translateY(-8px) scale(1.02); box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
+            .list-item { padding: 10px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+            .list-item + .list-item { margin-top: 8px; }
+            .small-muted { font-size: 12px; opacity: 0.7; }
         `;
         document.head.appendChild(style);
     }, []);
 
-    const [user, setUser] = useState(null);
-    const [mode, setMode] = useState("login");
-
-    const [posts, setPosts] = useState([]);
-    const [commentsMap, setCommentsMap] = useState({}); // postId -> [comments]
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [usersMap, setUsersMap] = useState({});
-
-    const [profileUser, setProfileUser] = useState(null); // viewing other user's profile
-    const [editingPostId, setEditingPostId] = useState(null);
-    const [editText, setEditText] = useState("");
-    const [commentInputs, setCommentInputs] = useState({});
-    const [viewTab, setViewTab] = useState('feed'); // 'feed' | 'settings' | 'profile'
-    const [miniProfile, setMiniProfile] = useState(null); // small popup for avatar click
-    const [editingCommentId, setEditingCommentId] = useState(null);
-    const [editingCommentText, setEditingCommentText] = useState('');
-
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-
-    const [postText, setPostText] = useState("");
-
-    const [settingsOpen, setSettingsOpen] = useState(false);
-    const [theme, setTheme] = useState("dark");
-    const [lang, setLang] = useState("ru");
-
-    // profile editor
-    const [profileOpen, setProfileOpen] = useState(false);
-    const [nameInput, setNameInput] = useState("");
-    const [usernameInput, setUsernameInput] = useState("");
-    const [descriptionInput, setDescriptionInput] = useState("");
-    const [avatarFile, setAvatarFile] = useState(null);
-    const [avatarPreview, setAvatarPreview] = useState(null);
-    const [uploading, setUploading] = useState(false);
-
-    const storage = getStorage();
-
-    const postsRef = collection(db, "posts");
-    const usersRef = collection(db, "users");
-
-    // AUTH
+    // Инициализация пользователя и подгрузка данных
     useEffect(() => {
-        onAuthStateChanged(auth, async (u) => {
-            try {
-                setUser(u);
-                setMode(u ? "app" : "login");
-
-                if (u) {
-                    // ensure user profile exists in firestore
-                    const userDocRef = doc(db, "users", u.uid);
-                    const snap = await getDoc(userDocRef);
-                    const name = u.displayName || (u.email ? u.email.split("@")[0] : "Guest");
-                    const photoURL = u.photoURL || null;
-
-                    if (!snap.exists()) {
-                        await setDoc(userDocRef, {
-                            uid: u.uid,
-                            email: u.email || null,
-                            name,
-                            photoURL,
-                            createdAt: Date.now(),
-                        });
-                        setUsersMap((m) => ({ ...m, [u.uid]: { uid: u.uid, name, photoURL } }));
-                    } else {
-                        const data = snap.data();
-                        setUsersMap((m) => ({ ...m, [u.uid]: { uid: u.uid, name: data.name || name, photoURL: data.photoURL || photoURL } }));
+        return onAuthStateChanged(auth, async (u) => {
+            if (u) {
+                const uRef = doc(db, "users", u.uid);
+                const snap = await getDoc(uRef);
+                if (!snap.exists()) {
+                    await setDoc(uRef, { uid: u.uid, nickname: u.displayName || "Gamer", email: u.email, status: "ready", createdAt: Date.now() });
+                } else {
+                    const d = snap.data();
+                    setNick(d.nickname || ""); setSteamID(d.gamingID || ""); setAge(d.age || "");
+                    setAvatar(d.avatar || ""); setLang(d.lang || "ru"); setTheme(d.theme || "dark");
+                    setUserStatus(d.status || "ready"); setPrivacyAge(d.hideAge || false);
+                    setSteamData(d.steam || null);
+                    // prefill CS hours and prime from linked Steam if available
+                    if (d.steam && d.steam.games) {
+                        const g = d.steam.games[730] || d.steam.games['730'];
+                        if (g) setCsHours(Math.round(g.playtime_hours || g.playtime / 60 || 0));
+                        if (typeof d.steam.hasPrime !== 'undefined') setHasPrime(!!d.steam.hasPrime);
                     }
                 }
-            } catch (e) {
-                console.error(e);
-            }
+                setUser(u); setStep("main_menu");
+                loadPosts(); // Загружаем ленту при входе
+                loadFriends();
+            } else setStep("auth");
         });
     }, []);
 
-    // LOAD POSTS (real-time)
+    const loadFriends = async () => {
+        // simple friends list: users where isFriendWith current user (field friends: [uid]) OR we can implement searching
+        const q = query(collection(db, 'users'), orderBy('nickname'));
+        const snap = await getDocs(q);
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setFriends(list.filter(u => u.uid !== user?.uid));
+    };
+
+    // Fetch Steam data using Steam Web API. Requires REACT_APP_STEAM_API_KEY to be set in env.
+    const fetchSteamData = async (steamIdInput) => {
+        const key = process.env.REACT_APP_STEAM_API_KEY;
+        if (!user) return alert('Сначала войдите в аккаунт');
+        if (!key) return alert('Steam API key not configured (REACT_APP_STEAM_API_KEY)');
+        if (!steamIdInput) return alert('Укажите Steam ID64 или vanity URL в профиле');
+        try {
+            let steamId64 = steamIdInput.trim();
+            // If input is not numeric, try to resolve vanity URL
+            if (!/^\d+$/.test(steamId64)) {
+                const rv = await fetch(`https://api.steampowered.com/ISteamUser/ResolveVanityURL/v1/?key=${key}&vanityurl=${encodeURIComponent(steamId64)}`).then(r => r.json());
+                if (rv.response && rv.response.success === 1) steamId64 = rv.response.steamid;
+                else return alert('Не удалось преобразовать vanity URL в SteamID64. Введите числовой SteamID64 или убедитесь, что vanity корректен.');
+            }
+
+            // Get player summary (avatar, name)
+            const ps = await fetch(`https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${key}&steamids=${steamId64}`).then(r => r.json());
+            const player = ps.response.players && ps.response.players[0];
+
+            // Get owned games with playtime
+            const og = await fetch(`https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${key}&steamid=${steamId64}&include_appinfo=1&include_played_free_games=1`).then(r => r.json());
+            const gamesArr = (og.response && og.response.games) || [];
+
+            // If gamesArr is empty, profile might be private
+            if (!gamesArr.length) {
+                // still save basic info but warn user
+                const steamInfoBasic = { steamId: steamId64, persona: player?.personaname || null, avatar: player?.avatarfull || player?.avatar || null, games: {}, hasPrime: false, fetchedAt: Date.now(), cs_hours: 0, verified: false };
+                await updateDoc(doc(db, 'users', user.uid), { steam: steamInfoBasic });
+                setSteamData(steamInfoBasic);
+                return alert('Профиль Steam приватный или нет доступных данных о играх. Сделайте профиль открытым и попробуйте снова.');
+            }
+
+            // Convert to map by appid and compute hours
+            const games = {};
+            gamesArr.forEach(g => { games[g.appid] = { appid: g.appid, name: g.name, playtime: g.playtime_forever || 0, playtime_hours: Math.round((g.playtime_forever||0)/60) }; });
+
+            // Approximate prime: check names mentioning 'prime'
+            let prime = false;
+            for (const k of Object.keys(games)) {
+                const n = (games[k].name||'').toLowerCase();
+                if (n.includes('prime')) { prime = true; break; }
+            }
+
+            const steamInfo = {
+                steamId: steamId64,
+                persona: player?.personaname || null,
+                avatar: player?.avatarfull || player?.avatar || null,
+                games,
+                hasPrime: prime,
+                fetchedAt: Date.now()
+            };
+
+            // Compute cs_hours for appid 730
+            const cs = games[730];
+            steamInfo.cs_hours = cs ? (cs.playtime_hours || Math.round((cs.playtime||0)/60)) : 0;
+
+            // Save to Firestore
+            await updateDoc(doc(db, 'users', user.uid), { steam: steamInfo });
+            setSteamData(steamInfo);
+            // set csHours and hasPrime locally
+            if (steamInfo.cs_hours) setCsHours(steamInfo.cs_hours);
+            setHasPrime(!!steamInfo.hasPrime);
+            alert('Steam аккаунт привязан. Данные загружены. Если профиль был приватным, откройте его и попробуйте снова для полной информации.');
+        } catch (err) {
+            console.error(err);
+            alert('Ошибка при обращении к Steam API');
+        }
+    };
+
+    // Подгрузка ленты постов (из оригинального кода)
+    const loadPosts = () => {
+        const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
+        onSnapshot(q, (s) => setPosts(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+        onSnapshot(collection(db, "users"), (s) => {
+            const m = {}; s.forEach(d => m[d.id] = d.data()); setUsersMap(m);
+        });
+    };
+
+    // Подписка на лобби CS2
     useEffect(() => {
-        setLoading(true);
-        setError(null);
-
-        const q = query(postsRef, orderBy("createdAt", "desc"));
-        const unsubscribe = onSnapshot(
-            q,
-            async (snap) => {
-                try {
-                    const postsData = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-                    setPosts(postsData);
-
-                    // ensure we have user info for authors
-                    const missingUids = Array.from(new Set(postsData.map((p) => p.uid))).filter((uid) => uid && !usersMap[uid]);
-                    if (missingUids.length) {
-                        for (const uid of missingUids) {
-                            try {
-                                const uSnap = await getDoc(doc(db, "users", uid));
-                                if (uSnap.exists()) {
-                                    const data = uSnap.data();
-                                    setUsersMap((m) => ({ ...m, [uid]: { uid, name: data.name || null, photoURL: data.photoURL || null } }));
-                                }
-                            } catch (e) {
-                                console.error("failed to load user", uid, e);
-                            }
-                        }
-                    }
-
-                    // load comments for posts (light, one-time)
-                    const cm = {};
-                    for (const p of postsData) {
-                        try {
-                            const cSnap = await getDocs(collection(db, "posts", p.id, "comments"));
-                            cm[p.id] = cSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-                        } catch (e) {
-                            cm[p.id] = [];
-                        }
-                    }
-                    setCommentsMap(cm);
-
-                    setLoading(false);
-                } catch (e) {
-                    console.error(e);
-                    setError("Failed to load posts");
-                    setLoading(false);
-                }
-            },
-            (err) => {
-                console.error(err);
-                setError("Failed to subscribe to posts");
-                setLoading(false);
-            }
-        );
-
-        return () => unsubscribe();
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-    // AUTH ACTIONS
-    const login = async () => {
-        const e = (email || '').trim();
-        const p = password || '';
-        if (!e || !p) return alert('Please enter email and password');
-        try {
-            await signInWithEmailAndPassword(auth, e, p);
-        } catch (e) {
-            console.error('login error', e);
-            if (e.code === 'auth/invalid-credential') alert('Invalid credentials provided. Check your input or try Google login.');
-            else alert(e.message || 'Login failed');
+        if (selectedGame === "cs2") {
+            const q = query(collection(db, "matchmaking_cs2"), orderBy("createdAt", "desc"));
+            return onSnapshot(q, s => {
+                const list = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                setLobby(list);
+                setMyQueueId(list.find(p => p.uid === user?.uid)?.id || null);
+            });
         }
-    };
+    }, [selectedGame]);
 
-    const register = async () => {
-        const e = (email || '').trim();
-        const p = password || '';
-        if (!e || !p) return alert('Please enter email and password');
-        if (p.length < 6) return alert('Password must be at least 6 characters');
-        try {
-            const res = await createUserWithEmailAndPassword(auth, e, p);
-            // create user doc handled in onAuthStateChanged
-            return res;
-        } catch (e) {
-            console.error('register error', e);
-            // Provide actionable guidance for common misconfiguration errors
-            const code = e.code || 'unknown';
-            if (code === 'auth/invalid-credential') {
-                alert(`Registration failed (${code}): Invalid credential.\nPossible causes: Email/Password provider is disabled in Firebase Console, or OAuth provider misconfiguration.\nCheck Firebase Authentication providers and authorized domains.`);
-            } else if (code === 'auth/network-request-failed') {
-                alert('Network error. Check your connection and try again.');
-            } else {
-                alert(`${code}: ${e.message || 'Registration failed'}`);
-            }
-        }
-    };
-
-    const guest = async () => {
-        try {
-            await signInAnonymously(auth);
-        } catch (e) {
-            console.error('guest login error', e);
-            alert(e.message || 'Guest login failed');
-        }
-    };
-
-    const googleLogin = async () => {
-        try {
-            await signInWithPopup(auth, new GoogleAuthProvider());
-        } catch (e) {
-            console.error('google login error', e);
-            const code = e.code || 'unknown';
-            if (code === 'auth/invalid-credential') {
-                alert(`Google login failed (${code}). Possible causes: OAuth client misconfiguration or unauthorized domain.\nOpen Firebase Console -> Authentication -> Sign-in method and ensure Google is enabled and your domain is authorized.`);
-            } else {
-                alert(`${code}: ${e.message || 'Google login failed'}`);
-            }
-        }
-    };
-
-    const logout = async () => {
-        if (!confirm("Are you sure you want to logout?")) return;
-        try {
-            await signOut(auth);
-        } catch (e) {
-            alert(e.message);
-        }
-    };
-
-    const openProfile = () => {
-        if (!user) return alert("Not logged in");
-        const u = usersMap[user.uid] || {};
-        setNameInput(u.name || user.displayName || "");
-        setUsernameInput(u.username || "");
-        setDescriptionInput(u.description || "");
-        setAvatarPreview(u.photoURL || user.photoURL || null);
-        setAvatarFile(null);
-        setProfileUser({ uid: user.uid, name: u.name || user.displayName || null, username: u.username || null, description: u.description || null, photoURL: u.photoURL || user.photoURL || null });
-        setProfileOpen(true);
-    };
-
-    const saveProfile = async () => {
-        if (!user) return alert("Not logged in");
+    // Обработка загрузки аватарки (Файлом)
+    const handleAvatarUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
         setUploading(true);
         try {
-            let photoURL = avatarPreview;
-
-            if (avatarFile) {
-                const path = `avatars/${user.uid}/${Date.now()}_${avatarFile.name}`;
-                const sRef = storageRef(storage, path);
-                await uploadBytes(sRef, avatarFile);
-                photoURL = await getDownloadURL(sRef);
-            }
-
-            // update firestore user doc
-            const userDocRef = doc(db, "users", user.uid);
-            await updateDoc(userDocRef, {
-                name: nameInput || null,
-                username: usernameInput || null,
-                description: descriptionInput || null,
-                photoURL: photoURL || null,
-            });
-
-            // update auth profile
-            try {
-                await updateProfile(auth.currentUser, { displayName: nameInput || null, photoURL: photoURL || null });
-            } catch (e) {
-                console.warn("Failed to update auth profile", e);
-            }
-
-            setUsersMap((m) => ({ ...m, [user.uid]: { uid: user.uid, name: nameInput || null, photoURL: photoURL || null, username: usernameInput || null, description: descriptionInput || null } }));
-            setProfileOpen(false);
-        } catch (e) {
-            console.error(e);
-            alert("Failed to save profile");
-        }
+            const fRef = storageRef(storage, `avatars/${user.uid}`);
+            await uploadBytes(fRef, file);
+            const url = await getDownloadURL(fRef);
+            await updateDoc(doc(db, "users", user.uid), { avatar: url });
+            setAvatar(url);
+        } catch (err) { alert("Ошибка загрузки"); }
         setUploading(false);
     };
 
-    const handleAvatarChange = (e) => {
-        const f = e.target.files && e.target.files[0];
-        if (!f) return;
-        setAvatarFile(f);
-        setAvatarPreview(URL.createObjectURL(f));
+    // Функции подбора
+    const enterQueue = async () => {
+        if (!nick) return alert("Сначала укажите ник в профиле!");
+        // Enforce Steam linking and anti-smurf check: require minimum hours in the selected game
+        const minHours = 15; // минимальное количество часов в игре для использования подборa
+        if (!steamData) {
+            return alert('Требуется привязать Steam аккаунт для проверки часов (чтобы избежать смурфинга)');
+        }
+        const hours = steamData.cs_hours || 0;
+        if (hours < minHours) {
+            return alert(`Недостаточно часов в CS: требуется минимум ${minHours} часов в игре для использования подбора.`);
+        }
+        await addDoc(collection(db, "matchmaking_cs2"), {
+            uid: user.uid, nickname: nick, skill: csSkill, hours: csHours,
+            prime: hasPrime, avatar, createdAt: Date.now()
+        });
     };
 
-    const deleteAccount = async () => {
-        if (!user) return alert("Not logged in");
-        if (!confirm("Delete your account? This action cannot be undone.")) return;
-        try {
-            // remove user doc
-            await deleteDoc(doc(db, "users", user.uid));
-
-            // attempt to delete auth user
-            try {
-                await deleteUser(auth.currentUser);
-            } catch (e) {
-                console.error("Failed to delete auth user", e);
-                alert("Failed to delete auth user. You may need to re-login and try again.");
-            }
-        } catch (e) {
-            console.error(e);
-            alert("Failed to delete account");
-        }
+    const exitQueue = async () => {
+        if (myQueueId) await deleteDoc(doc(db, "matchmaking_cs2", myQueueId));
     };
 
-    // POSTS
-    const createPost = async () => {
-        if (!user) return alert("You must be logged in to post");
-        if (!postText.trim()) return;
+    if (step === "loading") return <div style={{ color: 'white', padding: 50 }}>Загрузка...</div>;
 
-        try {
-            const authorName = usersMap[user.uid]?.name || user.displayName || (user.email ? user.email.split("@")[0] : "Guest");
-            const authorPhoto = usersMap[user.uid]?.photoURL || user.photoURL || null;
-
-            await addDoc(postsRef, {
-                text: postText,
-                uid: user.uid,
-                authorName,
-                authorPhoto,
-                likes: [],
-                dislikes: [],
-                createdAt: Date.now(),
-            });
-
-            setPostText("");
-        } catch (e) {
-            console.error(e);
-            alert("Failed to create post");
-        }
-    };
-
-    // COMMENTS
-    const addComment = async (postId, text, parentId = null) => {
-        if (!user) return alert("Login to comment");
-        if (!text.trim()) return;
-        try {
-            const u = usersMap[user.uid] || {};
-            await addDoc(collection(db, "posts", postId, "comments"), {
-                text,
-                uid: user.uid,
-                authorName: u.name || user.displayName || "User",
-                authorPhoto: u.photoURL || user.photoURL || null,
-                likes: [],
-                dislikes: [],
-                parentId: parentId || null,
-                createdAt: Date.now(),
-            });
-
-            const cSnap = await getDocs(collection(db, "posts", postId, "comments"));
-            setCommentsMap((m) => ({ ...m, [postId]: cSnap.docs.map((d) => ({ id: d.id, ...d.data() })) }));
-        } catch (e) {
-            console.error(e);
-            alert("Failed to add comment");
-        }
-    };
-
-    const toggleLike = async (post) => {
-        if (!user) return alert("Login to like");
-        const uid = user.uid;
-        let likes = post.likes || [];
-        let dislikes = post.dislikes || [];
-
-        if (likes.includes(uid)) {
-            likes = likes.filter((x) => x !== uid);
-        } else {
-            likes.push(uid);
-            dislikes = dislikes.filter((x) => x !== uid);
-        }
-
-        try {
-            await updateDoc(doc(db, "posts", post.id), { likes, dislikes });
-        } catch (e) {
-            console.error(e);
-            alert("Failed to update like");
-        }
-    };
-
-    const toggleDislike = async (post) => {
-        if (!user) return alert("Login to dislike");
-        const uid = user.uid;
-        let likes = post.likes || [];
-        let dislikes = post.dislikes || [];
-
-        if (dislikes.includes(uid)) {
-            dislikes = dislikes.filter((x) => x !== uid);
-        } else {
-            dislikes.push(uid);
-            likes = likes.filter((x) => x !== uid);
-        }
-
-        try {
-            await updateDoc(doc(db, "posts", post.id), { likes, dislikes });
-        } catch (e) {
-            console.error(e);
-            alert("Failed to update dislike");
-        }
-    };
-
-    const deletePost = async (post) => {
-        if (!user) return alert("Login to delete");
-        if (post.uid !== user.uid) return alert("You can only delete your own posts");
-
-        if (!confirm("Are you sure you want to delete this post? This cannot be undone.")) return;
-
-        try {
-            // delete comments subcollection (best-effort)
-            try {
-                const cSnap = await getDocs(collection(db, "posts", post.id, "comments"));
-                for (const cd of cSnap.docs) await deleteDoc(doc(db, "posts", post.id, "comments", cd.id));
-            } catch (e) {
-                console.warn("failed to delete comments", e);
-            }
-
-            await deleteDoc(doc(db, "posts", post.id));
-        } catch (e) {
-            console.error(e);
-            alert("Failed to delete post");
-        }
-    };
-
-    const container = {
-        minHeight: "100vh",
-        padding: '20px 12px',
-        maxWidth: 1100,
-        margin: "0 auto",
-        background: theme === "dark" ? "#0f0f0f" : "#f5f5f5",
-        color: theme === "dark" ? "#fff" : "#000",
-        fontFamily: "sans-serif",
-    };
-
-    // LOGIN SCREEN (redesigned)
-    if (mode === "login") {
-        return (
-            <div className="auth-screen">
-                <div className="auth-card">
-                    <div className="auth-left">
-                        <div className="logo-anim">Mideal</div>
-                        <p style={{marginTop:12}}>Share moments. Connect easily.</p>
-                    </div>
-                    <div className="auth-right">
-                        <div className="auth-form card-glass">
-                            <h2 style={{marginTop:0}}>Welcome back</h2>
-                            <p className="muted small">Log in to continue</p>
-                            <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
-                            <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
-
-                            <div style={{display:'flex',gap:8,marginTop:8}} className="auth-actions">
-                                <button className="primary" onClick={login}>Log in</button>
-                                <button className="ghost" onClick={register}>Register</button>
-                                <button className="ghost" onClick={guest}>Guest</button>
-                            </div>
-
-                            <div style={{marginTop:12}}>
-                                <button className="primary" style={{background:'#fff',color:'#111',width:'100%'}} onClick={googleLogin}>Continue with Google</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+    if (step === "auth") return (
+        <div className="main-view" style={{ justifyContent: 'center' }}>
+            <div className="card" style={{ maxWidth: 400, textAlign: 'center' }}>
+                <h1>Mideal Play</h1>
+                <input placeholder="Email" onChange={e => setEmail(e.target.value)} />
+                <input type="password" placeholder="Password" onChange={e => setPassword(e.target.value)} />
+                <button className="btn" style={{ width: '100%' }} onClick={() => signInWithEmailAndPassword(auth, email, password)}>Войти</button>
+                <button className="btn btn-gray" style={{ width: '100%', marginTop: 10 }} onClick={() => signInWithPopup(auth, new GoogleAuthProvider())}>Google</button>
             </div>
-        );
-    }
+        </div>
+    );
 
     return (
-        <div style={{...container, position: 'relative'}}>
-            {loading && (
-                <div className="loading-overlay">
-                    <div style={{textAlign:'center'}}>
-                        <div className="logo-anim">Mideal</div>
-                        <div className="muted small" style={{marginTop:8}}>Loading...</div>
-                    </div>
-                </div>
-            )}
-            {/* HEADER */}
-            <div className="topbar card-glass" style={{alignItems:'center'}}>
-                <div style={{display:'flex',alignItems:'center',gap:12}}>
-                    <div className="brand">Mideal</div>
-                    <div className="muted small">v0.1</div>
-                </div>
+        <div className="app-grid">
+            {/* ЛЕВАЯ ПАНЕЛЬ */}
+            <div className="sidebar">
+                <h2 style={{ color: 'var(--accent)' }}>MIDEAL</h2>
+                <div className={`menu-btn ${activeTab === 'games' ? 'active' : ''}`} onClick={() => setActiveTab('games')}>🎮 {t.games}</div>
+                <div className={`menu-btn ${activeTab === 'feed' ? 'active' : ''}`} onClick={() => setActiveTab('feed')}>📰 {t.feed}</div>
+                <div className={`menu-btn ${activeTab === 'friends' ? 'active' : ''}`} onClick={() => setActiveTab('friends')}>👥 {t.friends}</div>
+                <div className={`menu-btn ${activeTab === 'friends' ? 'active' : ''}`} onClick={() => setActiveTab('friends')}>👥 {t.friends}</div>
+                <div className={`menu-btn ${activeTab === 'profile' ? 'active' : ''}`} onClick={() => setActiveTab('profile')}>👤 {t.profile}</div>
+                <div className={`menu-btn ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>⚙️ {t.settings}</div>
 
-                <div style={{ display: "flex", gap: 10, alignItems:'center' }}>
-                    <button className="ghost" onClick={() => setViewTab('feed')}>Feed</button>
-                    <button className="ghost" onClick={() => setViewTab('profile')}>Profile</button>
-                    <button className="ghost" onClick={() => setViewTab('settings')}>Settings</button>
-                    <button className="ghost" onClick={logout}>Logout</button>
+                <div style={{ marginTop: 'auto' }}>
+                    <select value={userStatus} onChange={(e) => { setUserStatus(e.target.value); updateDoc(doc(db, "users", user.uid), { status: e.target.value }) }}>
+                        <option value="ready">🟢 {t.statusReady}</option>
+                        <option value="dnd">🔴 Не беспокоить</option>
+                    </select>
+                    <div className="menu-btn" onClick={() => signOut(auth)}>🚪 {t.logout}</div>
                 </div>
             </div>
 
-            {/* SETTINGS / PROFILE as separate tabs */}
-            {viewTab === 'settings' && (
-                <div className="overlay">
-                    <div className="modal">
-                        <h3>Settings</h3>
-                        <div className="settings-grid">
-                            <div className="toggle">
-                                <div style={{fontWeight:700}}>Theme</div>
-                                <div style={{marginLeft:'auto',display:'flex',gap:8}}>
-                                    <button className="ghost" onClick={() => setTheme('dark')}>Dark</button>
-                                    <button className="ghost" onClick={() => setTheme('light')}>Light</button>
-                                </div>
-                            </div>
-
-                            <div className="toggle">
-                                <div style={{fontWeight:700}}>Language</div>
-                                <div style={{marginLeft:'auto',display:'flex',gap:8}}>
-                                    <button className="ghost" onClick={() => setLang('ru')}>RU</button>
-                                    <button className="ghost" onClick={() => setLang('en')}>EN</button>
-                                </div>
-                            </div>
-
-                            <div className="toggle">
-                                <div style={{fontWeight:700}}>Account</div>
-                                <div style={{marginLeft:'auto'}}>
-                                    <button className="ghost" onClick={() => { setViewTab('profile'); setProfileOpen(true); }}>Profile</button>
-                                </div>
-                            </div>
-
-                            <div className="toggle">
-                                <div style={{fontWeight:700}}>Danger</div>
-                                <div style={{marginLeft:'auto'}}>
-                                    <button className="ghost" style={{color:'#f55'}} onClick={deleteAccount}>Delete Account</button>
-                                </div>
-                            </div>
+            {/* ЦЕНТРАЛЬНЫЙ БЛОК */}
+            <div className="main-view">
+                {activeTab === "games" && !selectedGame && (
+                    <div className="game-grid">
+                        <div className="game-card" onClick={() => setSelectedGame("cs2")}>
+                            <img src="https://upload.wikimedia.org/wikipedia/en/f/f2/CS2_Cover_Art.jpg" style={{ width: '100%', borderRadius: 15 }} />
+                            <h3>Counter-Strike 2</h3>
                         </div>
-
-                        <div style={{marginTop:12, textAlign:'right'}}>
-                            <button onClick={() => setViewTab('feed')} className="ghost">Close</button>
+                        <div className="game-card">
+                            <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR07fJ06_Y_4KxW9B97f0i6B7jR6_lU8_vXrg&s" style={{ width: '100%', borderRadius: 15 }} />
+                            <h3>Dota 2</h3>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            {profileOpen && profileUser && (
-                <div className="overlay">
-                    <div className="modal" style={{ maxWidth: 600 }}>
-                        <h3>Profile</h3>
-
-                        <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
-                            <div style={{ width: 140 }}>
-                                <div style={{ width: 120, height: 120, borderRadius: 12, overflow: "hidden", background: "#eee" }}>
-                                    {profileUser.photoURL ? (
-                                        <img src={profileUser.photoURL} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                    ) : (
-                                        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#666" }}>{(profileUser.name||profileUser.username||'U')[0]}</div>
-                                    )}
-                                </div>
-                                {profileUser.uid === user?.uid && (
-                                    <div style={{ marginTop: 8 }}>
-                                        <input type="file" accept="image/*" onChange={handleAvatarChange} />
-                                    </div>
-                                )}
+                {activeTab === "friends" && (
+                    <div style={{ width: '100%', maxWidth: 700 }} className="fade-in">
+                        <div className="card">
+                            <h2>{t.friends}</h2>
+                            <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+                                <input placeholder="Поиск по никнейму" value={friendQuery} onChange={e => setFriendQuery(e.target.value)} />
+                                <button className="btn" onClick={() => loadFriends()}>Обновить</button>
                             </div>
-
-                            <div style={{ flex: 1 }}>
-                                <div style={{ marginBottom: 8 }}>
-                                    <div style={{ display: "block", fontSize: 14, color: "#fff", fontWeight:700 }}>{profileUser.name || 'User'}</div>
-                                    <div className="muted small">@{profileUser.username || profileUser.uid}</div>
-                                </div>
-
-                                <div style={{ marginBottom: 8 }}>
-                                    <div style={{ fontSize: 13, color: '#ddd' }}>{profileUser.description || 'No description'}</div>
-                                </div>
-
-                                {profileUser.uid === user?.uid ? (
-                                    <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                                        <button className="primary" onClick={saveProfile} disabled={uploading}>{uploading ? "Saving..." : "Save"}</button>
-                                        <button onClick={() => setProfileOpen(false)} className="ghost">Close</button>
-                                        <button onClick={deleteAccount} className="ghost" style={{ marginLeft: "auto", color: "#900" }}>Delete account</button>
+                        </div>
+                        <div className="card">
+                            {friends.filter(f => f.nickname && f.nickname.toLowerCase().includes(friendQuery.toLowerCase())).map(f => (
+                                <div key={f.uid || f.id} className="list-item" style={{ border: '1px solid var(--border)' }}>
+                                    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                                        <img src={f.avatar || 'https://via.placeholder.com/48'} style={{ width: 48, height: 48, borderRadius: 12 }} />
+                                        <div>
+                                            <div style={{ fontWeight: 700 }}>{f.nickname || 'User'}</div>
+                                            <div className="small-muted">{f.gamingID ? `Steam: ${f.gamingID}` : ''}</div>
+                                        </div>
                                     </div>
-                                ) : (
+                                    <div style={{ display: 'flex', gap: 8 }}>
+                                        <button className="btn btn-gray" onClick={async () => { alert('Запрос в друзья отправлен (заглушка)'); }}>Добавить</button>
+                                        <button className="btn" onClick={() => { setActiveTab('profile'); setNick(f.nickname || ''); }}>Открыть профиль</button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === "games" && selectedGame === "cs2" && (
+                    <div style={{ width: '100%', maxWidth: 700 }}>
+                        <button className="btn btn-gray" onClick={() => setSelectedGame(null)}>← {t.back}</button>
+                        <div className="card" style={{ marginTop: 20 }}>
+                            <h2>{t.matchCS2}</h2>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 15 }}>
+                                <select value={csSkill} onChange={e => setCsSkill(e.target.value)}>
+                                    {t.ranks.map(r => <option key={r} value={r}>{r}</option>)}
+                                </select>
+                                <input type="number" placeholder={t.hours} value={csHours} onChange={e => setCsHours(e.target.value)} />
+                            </div>
+                            <div style={{ margin: '15px 0' }}>
+                                <input type="checkbox" checked={hasPrime} onChange={e => setHasPrime(e.target.checked)} /> {t.hasPrime}
+                            </div>
+                            {!myQueueId ? (
+                                <button className="btn" style={{ width: '100%' }} onClick={enterQueue}>{t.joinQueue}</button>
+                            ) : (
+                                <button className="btn btn-danger" style={{ width: '100%' }} onClick={exitQueue}>{t.leaveQueue}</button>
+                            )}
+                        </div>
+                        <div className="card">
+                            <h3>Активные лобби</h3>
+                            {lobby.map(p => (
+                                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                                        <img src={p.avatar || "https://via.placeholder.com/40"} style={{ width: 40, height: 40, borderRadius: '50%' }} />
+                                        <div><b>{p.nickname}</b><br /><small>{p.skill} • {p.hours}ч</small></div>
+                                    </div>
+                                    <button className="btn btn-gray" style={{ fontSize: 11 }}>{p.prime ? "⭐ Prime" : "No Prime"}</button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === "feed" && (
+                    <div style={{ width: '100%', maxWidth: 600 }}>
+                        <div className="card">
+                            <input placeholder="Что нового?" onKeyDown={async (e) => {
+                                if (e.key === 'Enter') {
+                                    await addDoc(collection(db, "posts"), { text: e.target.value, uid: user.uid, createdAt: Date.now(), likes: [] });
+                                    e.target.value = "";
+                                }
+                            }} />
+                        </div>
+                        {posts.map(p => (
+                            <div key={p.id} className="post-card">
+                                <div style={{ display: 'flex', gap: 10 }}>
+                                    <img src={usersMap[p.uid]?.avatar || ""} className="avatar-img" />
+                                    <div><b>{usersMap[p.uid]?.nickname || "User"}</b><br /><small>{new Date(p.createdAt).toLocaleString()}</small></div>
+                                </div>
+                                <p>{p.text}</p>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {activeTab === "profile" && (
+                    <div className="card" style={{ maxWidth: 600, textAlign: 'center' }}>
+                        <h1>{t.profile}</h1>
+                        <img src={avatar || "https://via.placeholder.com/100"} style={{ width: 120, height: 120, borderRadius: '50%', border: '4px solid var(--accent)' }} />
+                        <input type="file" id="fAva" style={{ display: 'none' }} onChange={handleAvatarUpload} />
+                        <div style={{ marginTop: 15 }}>
+                            <button className="btn btn-gray" onClick={() => document.getElementById('fAva').click()}>{uploading ? "..." : t.uploadPhoto}</button>
+                        </div>
+                        <div style={{ textAlign: 'left', marginTop: 25 }}>
+                            <label>{t.nickname}</label><input value={nick} onChange={e => setNick(e.target.value)} />
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>{t.steamId}
+                                <button className="btn btn-gray" style={{ padding: '6px 8px', fontSize: 12 }} onClick={() => setShowSteamGuide(s => !s)}>Как привязать Steam</button>
+                            </label>
+                            <input value={steamID} onChange={e => setSteamID(e.target.value)} placeholder="Пример: 76561198... или vanity (напр. username)" />
+                            <label>{t.age}</label><input type="number" value={age} onChange={e => setAge(e.target.value)} />
+                            <div style={{ display: 'flex', gap: 10 }}>
+                                <button className="btn" style={{ flex: 1 }} onClick={async () => {
+                                    await updateDoc(doc(db, "users", user.uid), { nickname: nick, gamingID: steamID, age: age });
+                                    alert("Данные сохранены!");
+                                }}>{t.save}</button>
+                                <button className="btn btn-gray" style={{ width: 180 }} onClick={() => {
+                                    // If Steam button not working for user, show a short guide
+                                    if (!process.env.REACT_APP_STEAM_API_KEY) {
+                                        setShowSteamGuide(true);
+                                    } else {
+                                        fetchSteamData(steamID);
+                                    }
+                                }}>{t.save === 'Сохранить' ? 'Привязать Steam' : 'Привязать Steam'}</button>
+                            </div>
+                            {showSteamGuide && (
+                                <div style={{ marginTop: 12, background: 'rgba(255,255,255,0.04)', padding: 12, borderRadius: 8 }}>
+                                    <h4 style={{ margin: '6px 0' }}>Как привязать Steam</h4>
+                                    <ol style={{ paddingLeft: 18, marginTop: 6 }}>
+                                        <li>Откройте свой профиль в Steam и скопируйте SteamID64 (числовой) или vanity (адрес после /id/).</li>
+                                        <li>Если у вас vanity (напр. "username"), можно использовать кнопку «Привязать Steam» — сайт попытается преобразовать vanity в SteamID64 автоматически.</li>
+                                        <li>Вставьте полученный SteamID64 или vanity в поле "Steam ID64" и нажмите «Привязать Steam».</li>
+                                        <li>Если данные о играх не подтянулись — убедитесь, что профиль публичный: Профиль → Редактировать профиль → Сделать профиль публичным.</li>
+                                        <li>После успешной привязки сайт загрузит часы в играх; для входа в подбор требуется минимум 15 часов в соответствующей игре.</li>
+                                    </ol>
                                     <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                                        <button className="primary" onClick={() => alert('Follow not implemented')}>Follow</button>
-                                        <button className="ghost" onClick={() => setProfileOpen(false)}>Close</button>
+                                        <button className="btn" onClick={() => { if (!process.env.REACT_APP_STEAM_API_KEY) { alert('Для прямой привязки Steam API ключ не настроен. См. документацию или используйте vanity/SteamID64 и попробуйте снова.'); } else fetchSteamData(steamID); }}>Привязать Steam</button>
+                                        <button className="btn btn-gray" onClick={() => setShowSteamGuide(false)}>Закрыть</button>
                                     </div>
-                                )}
-                            </div>
+                                </div>
+                            )}
                         </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            {/* CREATE POST */}
-            <div className="newpost card-glass">
-                <div className="newpost-left">
-                    <div className="avatar-small">
-                        {user && (usersMap[user.uid]?.photoURL || user.photoURL) ? <img src={usersMap[user.uid]?.photoURL || user.photoURL} alt="me" /> : <div className="initial">{(user?.displayName||"G")[0]}</div>}
+                {activeTab === "settings" && (
+                    <div className="card" style={{ maxWidth: 600 }}>
+                        <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+                            <button className="btn" onClick={() => setSettingsSubTab("general")}>Общие</button>
+                            <button className="btn btn-gray" onClick={() => setSettingsSubTab("privacy")}>Приватность</button>
+                        </div>
+                        {settingsSubTab === "general" ? (
+                            <select value={lang} onChange={(e) => setLang(e.target.value)}>
+                                <option value="ru">Русский</option>
+                                <option value="ua">Українська</option>
+                            </select>
+                        ) : (
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span>Скрыть возраст</span>
+                                <input type="checkbox" checked={privacyAge} onChange={e => { setPrivacyAge(e.target.checked); updateDoc(doc(db, "users", user.uid), { hideAge: e.target.checked }) }} style={{ width: 20 }} />
+                            </div>
+                        )}
                     </div>
-                </div>
-                <div style={{ flex: 1 }}>
-                    <textarea placeholder={user && !user.isAnonymous ? "Share something..." : "Guest — view only"} value={postText} onChange={(e) => setPostText(e.target.value)} disabled={!user || user.isAnonymous} />
-                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
-                        <button className="primary" onClick={createPost} disabled={!user || user.isAnonymous}>Post</button>
-                    </div>
-                </div>
+                )}
             </div>
 
-            {loading && <p>Loading posts...</p>}
-            {error && <p style={{ color: "red" }}>{error}</p>}
-
-            {/* POSTS */}
-            <div className="posts">
-                {posts.map((p) => (
-                    <div key={p.id} className="post card-glass fade-in">
-                        <div className="post-left">
-                            <div className="avatar">
-                                {p.authorPhoto ? <img src={p.authorPhoto} alt="a" /> : <div className="initial">{(p.authorName||"U")[0]}</div>}
-                            </div>
-                        </div>
-                        <div className="post-body">
-                        <div className="post-header">
-                                <div>
-                                    <div style={{display: 'flex', alignItems: 'center', gap: 10}}>
-                                        <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
-                                            <button className="linkish" onClick={async () => { const uSnap = await getDoc(doc(db, 'users', p.uid)); if (uSnap.exists()) setMiniProfile({ uid: p.uid, ...uSnap.data() }); }}>{p.authorName || usersMap[p.uid]?.name || "User"}</button>
-                                            <div className="muted small">{new Date(p.createdAt).toLocaleString()}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="post-controls">
-                                    <button onClick={() => toggleLike(p)}>👍 {p.likes?.length || 0}</button>
-                                    <button onClick={() => toggleDislike(p)}>👎 {p.dislikes?.length || 0}</button>
-                                    {p.uid === user?.uid ? <button onClick={() => { setEditingPostId(p.id); setEditText(p.text); }}>edit</button> : null}
-                                    {p.uid === user?.uid ? <button onClick={() => deletePost(p)}>delete</button> : null}
-                                </div>
-                            </div>
-
-                            <div className="post-content">
-                                {editingPostId === p.id ? (
-                                    <div>
-                                        <textarea value={editText} onChange={(e) => setEditText(e.target.value)} style={{ width: '100%' }} />
-                                        <div style={{ textAlign: 'right', marginTop: 6 }}>
-                                            <button className="primary" onClick={async () => { await updateDoc(doc(db, 'posts', p.id), { text: editText }); setEditingPostId(null); }}>Save</button>
-                                            <button onClick={() => setEditingPostId(null)}>Cancel</button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="post-text">{p.text}</div>
-                                )}
-                            </div>
-
-                            <div className="comments-section">
-                                <div className="comments-list">
-                                    {(commentsMap[p.id] || []).filter(c=>!c.parentId).map((c) => (
-                                        <div key={c.id} className="comment">
-                                            <div className="comment-left">
-                                                <div className="avatar-small">
-                                                    {c.authorPhoto ? <img src={c.authorPhoto} alt="a" /> : <div className="initial">{(c.authorName||"U")[0]}</div>}
-                                                </div>
-                                            </div>
-                                            <div className="comment-body">
-                                                <div className="comment-meta" style={{display:'flex',gap:8,alignItems:'center'}}>
-                                                    <button className="linkish" onClick={async ()=>{ const uSnap = await getDoc(doc(db,'users',c.uid)); if(uSnap.exists()) setMiniProfile({uid:c.uid,...uSnap.data()}); }}>{c.authorName}</button>
-                                                    <span className="small muted"> · {new Date(c.createdAt).toLocaleString()}</span>
-                                                    {c.uid === user?.uid && (
-                                                        <div style={{marginLeft:'auto',display:'flex',gap:6}}>
-                                                            <button className="ghost" onClick={()=>{ setEditingCommentId(c.id); setEditingCommentText(c.text); }}>edit</button>
-                                                            <button className="ghost" onClick={async ()=>{ if(!confirm('Delete this comment?')) return; await deleteDoc(doc(db,'posts',p.id,'comments',c.id)); const cSnap = await getDocs(collection(db,'posts',p.id,'comments')); setCommentsMap(m=>({...m,[p.id]:cSnap.docs.map(d=>({id:d.id,...d.data()}))})); }}>delete</button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div className="comment-text">
-                                                    {editingCommentId === c.id ? (
-                                                        <div>
-                                                            <input value={editingCommentText} onChange={(e)=>setEditingCommentText(e.target.value)} />
-                                                            <div style={{textAlign:'right',marginTop:6}}>
-                                                                <button className="primary" onClick={async ()=>{ await updateDoc(doc(db,'posts',p.id,'comments',c.id),{text:editingCommentText}); setEditingCommentId(null); const cSnap = await getDocs(collection(db,'posts',p.id,'comments')); setCommentsMap(m=>({...m,[p.id]:cSnap.docs.map(d=>({id:d.id,...d.data()}))})); }}>Save</button>
-                                                                <button onClick={()=>setEditingCommentId(null)}>Cancel</button>
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        c.text
-                                                    )}
-                                                </div>
-                                                <div className="comment-actions">
-                                                    <button onClick={async ()=>{ const uid = user?.uid; if(!uid) return alert('Login to like'); try{ let likes=c.likes||[]; let dislikes=c.dislikes||[]; if(likes.includes(uid)) likes=likes.filter(x=>x!==uid); else{likes.push(uid);dislikes=dislikes.filter(x=>x!==uid);} await updateDoc(doc(db,'posts',p.id,'comments',c.id),{likes,dislikes}); const cSnap = await getDocs(collection(db,'posts',p.id,'comments')); setCommentsMap(m=>({...m,[p.id]:cSnap.docs.map(d=>({id:d.id,...d.data()}))})); }catch(e){console.error(e);alert('Failed to update like')} }}>👍 {c.likes?.length||0}</button>
-                                                    <button onClick={async ()=>{ const uid = user?.uid; if(!uid) return alert('Login to dislike'); try{ let likes=c.likes||[]; let dislikes=c.dislikes||[]; if(dislikes.includes(uid)) dislikes=dislikes.filter(x=>x!==uid); else{dislikes.push(uid);likes=likes.filter(x=>x!==uid);} await updateDoc(doc(db,'posts',p.id,'comments',c.id),{likes,dislikes}); const cSnap = await getDocs(collection(db,'posts',p.id,'comments')); setCommentsMap(m=>({...m,[p.id]:cSnap.docs.map(d=>({id:d.id,...d.data()}))})); }catch(e){console.error(e);alert('Failed to update dislike')} }}>👎 {c.dislikes?.length||0}</button>
-                                                    <button onClick={()=>{ setCommentInputs(inputs=>({...inputs,[p.id]:{text:'',parentId:c.id}})); }}>reply</button>
-                                                </div>
-
-                                                <div className="comment-replies">
-                                                    {(commentsMap[p.id]||[]).filter(r=>r.parentId===c.id).map(r=> (
-                                                        <div key={r.id} className="comment reply">
-                                                            <div className="comment-left">
-                                                                <div className="avatar-small">{r.authorPhoto ? <img src={r.authorPhoto} alt="a" /> : <div className="initial">{(r.authorName||"U")[0]}</div>}</div>
-                                                            </div>
-                                                            <div className="comment-body">
-                                                                <div className="comment-meta"><button className="linkish" onClick={async ()=>{ const uSnap = await getDoc(doc(db,'users',r.uid)); if(uSnap.exists()) setProfileUser({uid:r.uid,...uSnap.data()}); setProfileOpen(true); }}>{r.authorName}</button> <span className="small muted"> · {new Date(r.createdAt).toLocaleString()}</span></div>
-                                                                <div>{r.text}</div>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <div className="comment-box">
-                                    <input placeholder={user ? 'Write a comment...' : 'Login to comment'} value={(commentInputs[p.id] && commentInputs[p.id].text) || ''} onChange={(e)=>setCommentInputs(inputs=>({...inputs,[p.id]:{...(inputs[p.id]||{}),text:e.target.value}}))} disabled={!user} />
-                                    <div style={{textAlign:'right',marginTop:6}}>
-                                        <button onClick={async ()=>{ const ci = commentInputs[p.id]||{}; await addDoc(collection(db,'posts',p.id,'comments'),{ text:ci.text||'', uid:user.uid, authorName: usersMap[user.uid]?.name||user.displayName||'User', authorPhoto: usersMap[user.uid]?.photoURL||user.photoURL||null, likes:[], dislikes:[], parentId:ci.parentId||null, createdAt: Date.now() }); const cSnap = await getDocs(collection(db,'posts',p.id,'comments')); setCommentsMap(m=>({...m,[p.id]:cSnap.docs.map(d=>({id:d.id,...d.data()}))})); setCommentInputs(inputs=>({...inputs,[p.id]:{text:'',parentId:null}})); }} disabled={!user}>Comment</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                ))}
+            {/* ПРАВАЯ ПАНЕЛЬ (Краткий инфо-блок) */}
+            <div className="sidebar" style={{ borderLeft: '1px solid var(--border)', borderRight: 'none' }}>
+                <div style={{ textAlign: 'center', marginBottom: 20 }}>
+                    <img src={avatar} style={{ width: 100, height: 100, borderRadius: 25 }} />
+                    <h3 style={{ margin: '10px 0' }}>{nick || "Gamer"}</h3>
+                    <div style={{ fontSize: 12, color: 'var(--accent)' }}>{userStatus === 'ready' ? '● В сети' : '○ Не в сети'}</div>
+                </div>
+                <div className="card" style={{ fontSize: 13, opacity: 0.8, padding: 15 }}>
+                    {age && !privacyAge && <p>🎂 Возраст: {age}</p>}
+                    {steamID && <p>🎮 Steam ID: {steamID}</p>}
+                </div>
+                <div style={{ padding: 15 }}>
+                    <h4>Друзья онлайн</h4>
+                    <p style={{ fontSize: 12, opacity: 0.5 }}>У вас пока нет друзей в списке.</p>
+                </div>
             </div>
         </div>
     );
 }
- 
