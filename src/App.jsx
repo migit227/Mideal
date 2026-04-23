@@ -67,6 +67,7 @@ export default function App() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const t = translations[lang] || translations.ru;
+    const [authLoading, setAuthLoading] = useState(false);
 
     useEffect(() => {
         const id = 'mideal-full-v5';
@@ -194,14 +195,32 @@ export default function App() {
             const cs = games[730];
             steamInfo.cs_hours = cs ? (cs.playtime_hours || Math.round((cs.playtime||0)/60)) : 0;
 
-            await updateDoc(doc(db, 'users', user.uid), { steam: steamInfo });
-            setSteamData(steamInfo);
+            // Try to call server-side attach endpoint to securely update Firestore (if available)
+            try {
+                const attachRes = await fetch(`${proxy}/attachSteam`, {
+                    method: 'POST', headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({ uid: user.uid, steamid: steamId64 })
+                }).then(r => r.json());
+                if (attachRes && attachRes.success) {
+                    setSteamData(attachRes.steam);
+                } else {
+                    // fallback to client-side update
+                    await updateDoc(doc(db, 'users', user.uid), { steam: steamInfo });
+                    setSteamData(steamInfo);
+                }
+            } catch (e) {
+                // if server attach fails, fallback
+                await updateDoc(doc(db, 'users', user.uid), { steam: steamInfo });
+                setSteamData(steamInfo);
+            }
             if (steamInfo.cs_hours) setCsHours(steamInfo.cs_hours);
             setHasPrime(!!steamInfo.hasPrime);
             alert('Steam аккаунт привязан. Данные загружены.');
         } catch (err) {
             console.error(err);
             alert('Ошибка при обращении к Steam API через прокси');
+            // attempt to provide more helpful message
+            if (err && err.message) console.error(err.message);
         }
     };
 
@@ -294,10 +313,43 @@ export default function App() {
         <div className="main-view" style={{ justifyContent: 'center' }}>
             <div className="card" style={{ maxWidth: 400, textAlign: 'center' }}>
                 <h1>Mideal Play</h1>
-                <input placeholder="Email" onChange={e => setEmail(e.target.value)} />
-                <input type="password" placeholder="Password" onChange={e => setPassword(e.target.value)} />
-                <button className="btn" style={{ width: '100%' }} onClick={() => signInWithEmailAndPassword(auth, email, password)}>Войти</button>
-                <button className="btn btn-gray" style={{ width: '100%', marginTop: 10 }} onClick={() => signInWithPopup(auth, new GoogleAuthProvider())}>Google</button>
+                <input placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} />
+                <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} />
+                <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn" style={{ flex: 1 }} onClick={async () => {
+                        setAuthLoading(true);
+                        try {
+                            await signInWithEmailAndPassword(auth, email, password);
+                        } catch (err) { alert('Ошибка входа: ' + (err.message || err)); }
+                        setAuthLoading(false);
+                    }}>{authLoading ? '...' : 'Войти'}</button>
+                    <button className="btn btn-gray" style={{ width: 140 }} onClick={async () => {
+                        setAuthLoading(true);
+                        try {
+                            const cred = await createUserWithEmailAndPassword(auth, email, password);
+                            // create user doc
+                            const u = cred.user;
+                            await setDoc(doc(db, 'users', u.uid), { uid: u.uid, nickname: u.displayName || 'Gamer', email: u.email, status: 'ready', createdAt: Date.now() });
+                            alert('Аккаунт создан');
+                        } catch (err) { alert('Ошибка регистрации: ' + (err.message || err)); }
+                        setAuthLoading(false);
+                    }}>Регистрация</button>
+                </div>
+                <button className="btn btn-gray" style={{ width: '100%', marginTop: 10 }} onClick={async () => {
+                    setAuthLoading(true);
+                    try {
+                        const provider = new GoogleAuthProvider();
+                        const res = await signInWithPopup(auth, provider);
+                        // ensure user document exists
+                        const u = res.user;
+                        const uRef = doc(db, 'users', u.uid);
+                        const s = await getDoc(uRef);
+                        if (!s.exists()) {
+                            await setDoc(uRef, { uid: u.uid, nickname: u.displayName || 'Gamer', email: u.email, status: 'ready', createdAt: Date.now() });
+                        }
+                    } catch (err) { alert('Ошибка Google входа: ' + (err.message || err)); }
+                    setAuthLoading(false);
+                }}>Google</button>
             </div>
         </div>
     );
