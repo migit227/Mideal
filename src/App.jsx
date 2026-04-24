@@ -68,6 +68,8 @@ export default function App() {
     const [password, setPassword] = useState("");
     const t = translations[lang] || translations.ru;
     const [authLoading, setAuthLoading] = useState(false);
+    // Жёстко заданный proxyUrl для привязки на продакшн-домен
+    const proxyUrl = 'https://stimprivyazka.vercel.app';
 
     useEffect(() => {
         const id = 'mideal-full-v5';
@@ -137,6 +139,36 @@ export default function App() {
         });
     }, []);
 
+    // Listen for postMessage from steam-openid popup
+    useEffect(() => {
+        const handler = (e) => {
+            try {
+                const data = e.data;
+                if (!data || data.type !== 'steam-linked') return;
+                const steam = data.steam;
+                if (steam) {
+                    setSteamData(steam);
+                    if (steam.cs_hours) setCsHours(steam.cs_hours);
+                    setHasPrime(!!steam.hasPrime);
+                    alert('Steam аккаунт успешно привязан: ' + (steam.persona || steam.steamId));
+                }
+            } catch (err) { console.error('postMessage handler error', err); }
+        };
+        window.addEventListener('message', handler);
+        return () => window.removeEventListener('message', handler);
+    }, []);
+
+    const unlinkSteam = async () => {
+        if (!user) return alert('Сначала войдите в аккаунт');
+        try {
+            await updateDoc(doc(db, 'users', user.uid), { steam: null });
+            setSteamData(null);
+            setCsHours('');
+            setHasPrime(false);
+            alert('Steam аккаунт отвязан');
+        } catch (err) { console.error(err); alert('Ошибка при отвязке'); }
+    };
+
     // Subscribe to current user's document to get steam updates pushed from server-side linking
     useEffect(() => {
         if (!user) return;
@@ -159,15 +191,38 @@ export default function App() {
         if (!user) return alert('Сначала войдите в аккаунт');
         try {
             const idToken = await user.getIdToken();
+            // Use global proxyUrl (robust detection)
+            const proxy = proxyUrl;
+            if (!proxy) return alert('Прокси не настроен. Проверь REACT_APP_STEAM_PROXY или .env.local');
+
+            // Quick health check
+            try {
+                const h = await Promise.race([
+                    fetch(`${proxy}/health`).then(r => r.ok ? r : Promise.reject(new Error('no-health'))),
+                    new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 2000))
+                ]);
+            } catch (err) {
+                console.warn('Proxy health check failed', err);
+                // proceed but warn user
+                if (!confirm('Прокси не отвечает. Продолжить попытку привязки?')) return;
+            }
+
             // Inform server to store uid in session for linking
-            const proxy = process.env.REACT_APP_STEAM_PROXY || 'http://localhost:3001';
-            await fetch(`${proxy}/initLink`, {
-                method: 'POST', headers: { 'content-type': 'application/json' },
+            const res = await fetch(`${proxy}/initLink`, {
+                method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' },
                 body: JSON.stringify({ idToken })
             });
-            // Open Steam auth in popup
-            const w = window.open(`${proxy}/auth/steam`, 'steam_auth', 'width=900,height=700');
-            if (!w) alert('Поп-ап заблокирован, разрешите всплывающие окна и попробуйте снова.');
+            if (!res.ok) {
+                const txt = await res.text().catch(() => '');
+                throw new Error('initLink failed: ' + (txt || res.status));
+            }
+
+            // Open Steam auth in popup. Include idToken in query as fallback so server can associate the session
+            const openUrl = `${proxy.replace(/\/$/, '')}/auth/steam?idToken=${encodeURIComponent(idToken)}`;
+            const w = window.open(openUrl, 'steam_auth', 'width=900,height=700');
+            if (!w) return alert('Поп-ап заблокирован, разрешите всплывающие окна и попробуйте снова.');
+            // focus popup
+            w.focus && w.focus();
         } catch (err) { console.error(err); alert('Не удалось начать привязку Steam'); }
     };
 
@@ -181,7 +236,7 @@ export default function App() {
 
     // Fetch Steam data using Steam Web API. Requires REACT_APP_STEAM_API_KEY to be set in env.
     const fetchSteamData = async (steamIdInput) => {
-        const proxy = process.env.REACT_APP_STEAM_PROXY || 'http://localhost:3001';
+        const proxy = proxyUrl;
         if (!user) return alert('Сначала войдите в аккаунт');
         if (!steamIdInput) return alert('Укажите Steam ID64 или vanity URL в профиле');
         try {
@@ -262,7 +317,7 @@ export default function App() {
     // Note: Steam may block cross-origin requests; this function will handle failures and show a helpful message.
     const autoFindSteamId = async (name) => {
         if (!name || !name.trim()) return alert('Введите никнейм для поиска');
-        const proxy = process.env.REACT_APP_STEAM_PROXY || 'http://localhost:3001';
+        const proxy = proxyUrl;
         try {
             const maybeVanity = name.trim();
             // try vanity via proxy
@@ -525,19 +580,22 @@ export default function App() {
                             </label>
                             <input value={steamID} onChange={e => setSteamID(e.target.value)} placeholder="Пример: 76561198... или vanity (напр. username)" />
                             <label>{t.age}</label><input type="number" value={age} onChange={e => setAge(e.target.value)} />
-                            <div style={{ display: 'flex', gap: 10 }}>
+                            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                                 <button className="btn" style={{ flex: 1 }} onClick={async () => {
                                     await updateDoc(doc(db, "users", user.uid), { nickname: nick, gamingID: steamID, age: age });
                                     alert("Данные сохранены!");
                                 }}>{t.save}</button>
-                                <button className="btn btn-gray" style={{ width: 180 }} onClick={() => {
-                                    // If Steam button not working for user, show a short guide
-                                    if (!process.env.REACT_APP_STEAM_API_KEY) {
-                                        setShowSteamGuide(true);
-                                    } else {
-                                        fetchSteamData(steamID);
-                                    }
-                                }}>{t.save === 'Сохранить' ? 'Привязать Steam' : 'Привязать Steam'}</button>
+                                {!steamData ? (
+                                    <button className="btn btn-gray" style={{ width: 180 }} onClick={() => linkSteam()}>Привязать Steam</button>
+                                ) : (
+                                    <div style={{ display: 'flex', gap: 8 }}>
+                                        <div style={{ textAlign: 'right', fontSize: 13 }}>
+                                            <div><b>{steamData.persona || steamData.steamId}</b></div>
+                                            <div className="small-muted">CS часы: {steamData.cs_hours || 0}</div>
+                                        </div>
+                                        <button className="btn btn-gray" style={{ width: 120 }} onClick={() => unlinkSteam()}>Отвязать</button>
+                                    </div>
+                                )}
                             </div>
                             {showSteamGuide && (
                                 <div style={{ marginTop: 12, background: 'rgba(255,255,255,0.04)', padding: 14, borderRadius: 10 }}>
